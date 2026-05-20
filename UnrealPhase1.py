@@ -97,7 +97,19 @@ def start_game(sio):
 
     npc_introduce(turn, sio)
 # -----------------------------------------------------------------------------------
-def advance_game(turn, player_text, npc_text,sio):
+def advance_game(turn, player_text, npc_text, sio):
+    """Thread-safe wrapper: only one turn can run at a time."""
+    if not turn._lock.acquire(blocking=False):
+        turn.cancel_stream = True
+        print("[advance_game] ignored \u2014 another turn in progress")
+        return
+    try:
+        _advance_game_impl(turn, player_text, npc_text, sio)
+    finally:
+        turn._lock.release()
+
+
+def _advance_game_impl(turn, player_text, npc_text, sio):
 
     turn.player_text = player_text
     turn.last_npc_text = npc_text

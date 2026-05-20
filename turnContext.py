@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List
+import threading
 
 @dataclass
 class EmotionGameTurn:
@@ -20,4 +21,6 @@ class EmotionGameTurn:
     player_text:        str = ""
     last_npc_text:      str = ""
     cues:               List[str] = field(default_factory=list)
-    cancel_stream:      bool = False  # set by player_stepped_away to halt in-flight OpenAI/TTS stream
+    cancel_stream:      bool = False
+    streaming:          bool = False
+    _lock:              threading.Lock = field(default_factory=threading.Lock)

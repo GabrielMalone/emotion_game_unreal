@@ -19,6 +19,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     # Clear any stale cancel flag from a previous walk-away that
     # didn't coincide with an active stream.
     t.cancel_stream = False
+    t.streaming = True
 
     # ------------------------------------------------------------------
     # Safe emit helper

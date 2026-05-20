@@ -79,6 +79,12 @@ def init_socket_events(app):
             print("[player_input] received empty data, ignoring")
             return
         turn = active_turns[idUser]
+        # Ignore input while NPC is already speaking/streaming
+        if turn.streaming:
+            turn.cancel_stream = True
+            turn.streaming = False  # force-reset stale flag from cancelled stream
+            print("[player_input] ignored — NPC already speaking")
+            return
         advance_game(turn, data.get("player_text", ""), data.get("last_npc_text", ""), sio=sio)
         #--------------------------------------------------------------
     # ---------------------------------------------------------------
