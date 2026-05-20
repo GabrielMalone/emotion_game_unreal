@@ -65,6 +65,18 @@ def assignEmotion(turn, sio):
 # -----------------------------------------------------------------------------------
 def start_game(sio):
 
+    # Acquire the turn lock so no emotion clicks sneak in during intro
+    if not turn._lock.acquire(blocking=False):
+        print("[start_game] ignored — another turn in progress")
+        return
+    try:
+        _start_game_impl(sio)
+    finally:
+        turn._lock.release()
+
+
+def _start_game_impl(sio):
+
     # the following two conditions are if the game has started
     # and the player walked away and came back
     with get_cursor(dictionary=True) as (db, cursor):
