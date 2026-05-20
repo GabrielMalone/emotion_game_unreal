@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+egvenv/
+venv/
+*.egg
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+tts_cache/
+.mini_agent_backups/
+.mini_agent_memory.db
+.mini_agent_index.json
+.pytest_cache/
+reports/
+
+# Streaming audio
+*.mp3
+*.wav
