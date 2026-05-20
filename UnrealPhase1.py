@@ -112,7 +112,6 @@ def _start_game_impl(sio):
 def advance_game(turn, player_text, npc_text, sio):
     """Thread-safe wrapper: only one turn can run at a time."""
     if not turn._lock.acquire(blocking=False):
-        turn.cancel_stream = True
         print("[advance_game] ignored \u2014 another turn in progress")
         return
     try:

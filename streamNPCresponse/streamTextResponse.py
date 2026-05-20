@@ -121,6 +121,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             sio.sleep(0)
     # ----------------------------------------------------------
 
+    t.streaming = False
     return "".join(full_text)
 
 
