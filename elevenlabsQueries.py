@@ -29,50 +29,93 @@ _eleven = ElevenLabs(
     httpx_client=http_client,
 )
 
-# Per-emotion VoiceSettings
-# stability: 0.35-0.50 keeps expressiveness without accent drift
-# style:     0.25-0.35 adds character without amplifying vocal artifacts
+# Per-emotion VoiceSettings — TUNED FOR EXTREME EXPRESSIVENESS
+# stability: 0.20-0.32 — very low for maximum emotional variation
+#            (expect occasional wobble; worth it for game character)
+# style:     0.35-0.55 — high character/stylisation
+# speed:     wider emotional range
 EMOTION_VOICE_SETTINGS = {
-    "happy":     VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.30, speed=1.05, use_speaker_boost=True),
-    "excited":   VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.35, speed=1.15, use_speaker_boost=True),
-    "surprised": VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.30, speed=1.10, use_speaker_boost=True),
-    "sad":       VoiceSettings(stability=0.42, similarity_boost=0.75, style=0.25, speed=0.88, use_speaker_boost=True),
-    "angry":     VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.35, speed=1.20, use_speaker_boost=True),
-    "afraid":    VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.28, speed=1.05, use_speaker_boost=True),
-    "disgusted": VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.30, speed=0.95, use_speaker_boost=True),
-    "calm":      VoiceSettings(stability=0.45, similarity_boost=0.75, style=0.25, speed=0.92, use_speaker_boost=True),
-    "neutral":   VoiceSettings(stability=0.48, similarity_boost=0.75, style=0.20, speed=1.00, use_speaker_boost=True),
-    "worried":   VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.28, speed=0.95, use_speaker_boost=True),
+    "happy":     VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.50, speed=1.10, use_speaker_boost=True),
+    "excited":   VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.55, speed=1.25, use_speaker_boost=True),
+    "surprised": VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.50, speed=1.15, use_speaker_boost=True),
+    "sad":       VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.40, speed=0.82, use_speaker_boost=True),
+    "angry":     VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.55, speed=1.30, use_speaker_boost=True),
+    "afraid":    VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.45, speed=1.10, use_speaker_boost=True),
+    "disgusted": VoiceSettings(stability=0.25, similarity_boost=0.75, style=0.45, speed=0.90, use_speaker_boost=True),
+    "calm":      VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.40, speed=0.88, use_speaker_boost=True),
+    "neutral":   VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.35, speed=1.00, use_speaker_boost=True),
+    "worried":   VoiceSettings(stability=0.25, similarity_boost=0.75, style=0.42, speed=0.92, use_speaker_boost=True),
 }
-_DEFAULT_VOICE_SETTINGS = VoiceSettings(stability=0.40, similarity_boost=0.75, style=0.25, speed=1.0, use_speaker_boost=True)
+_DEFAULT_VOICE_SETTINGS = VoiceSettings(stability=0.25, similarity_boost=0.75, style=0.40, speed=1.0, use_speaker_boost=True)
 
-# Audio tag vocabularies per emotion
-# Use emotional adjectives only -- delivery-description tags like
-# [voice breaking], [trembling], [shakily] cause voice instability.
+# ==================================================================
+# Audio tag vocabularies per emotion (2025/2026 ElevenLabs best practices)
+#
+# Key principles from ElevenLabs v3 docs:
+#   - Tags affect ~4-5 words then delivery returns to baseline
+#   - Place tags INLINE at emotional shift points, not just sentence starts
+#   - Post-sentence reactions often sound more natural than pre-sentence
+#   - Layer emotion + non-verbal: "[sad][sighs] I don't know..."
+#   - Use ellipses + punctuation WITH tags for pacing/hesitation
+#   - Match tags to voice character — Sarah is warm, professional, young
+#   - Sparse is better: 40-60% coverage, not every sentence
+# ==================================================================
+
+# Primary emotion/delivery tags — placed at sentence start or mid-sentence
+# All tags verified against ElevenLabs documentation
 EMOTION_TAGS = {
-    "happy":     ["[happily]", "[laughs]", "[warmly]"],
-    "excited":   ["[excitedly]", "[excited]", "[eagerly]"],
-    "surprised": ["[surprised]", "[astonished]"],
-    "sad":       ["[sadly]", "[sighs]", "[quietly]"],
-    "angry":     ["[angrily]", "[frustrated]", "[sharply]"],
-    "afraid":    ["[nervously]", "[fearfully]", "[whispers]"],
-    "disgusted": ["[disgusted]", "[queasily]"],
-    "calm":      ["[calmly]", "[gently]", "[soothingly]"],
-    "neutral":   ["[thoughtfully]"],
-    "worried":   ["[worriedly]", "[uncertainly]", "[anxiously]"],
+    "happy":     ["[happily]", "[cheerfully]", "[warmly]", "[laughs]",
+                  "[playfully]", "[brightly]"],
+    "excited":   ["[excited]", "[eagerly]", "[enthusiastically]",
+                  "[energetically]", "[excitedly]"],
+    "surprised": ["[surprised]", "[gasps]", "[astonished]", "[incredulously]",
+                  "[shocked]"],
+    "sad":       ["[sadly]", "[sorrowful]", "[quietly]", "[sighs]",
+                  "[melancholy]", "[resigned]"],
+    "angry":     ["[angrily]", "[frustrated]", "[harsh]", "[indignant]",
+                  "[irritated]", "[annoyed]"],
+    "afraid":    ["[nervously]", "[whispering]", "[fearfully]", "[trembling]",
+                  "[timidly]", "[uncertain]"],
+    "disgusted": ["[disgusted]", "[appalled]", "[dismissive]",
+                  "[sarcastic]", "[disdain]"],
+    "calm":      ["[calmly]", "[gently]", "[softly]", "[warm]",
+                  "[soothingly]", "[peacefully]"],
+    "neutral":   ["[thoughtfully]", "[matter-of-fact]", "[conversationally]",
+                  "[reflectively]"],
+    "worried":   ["[worried]", "[hesitant]", "[nervous]", "[uncertain]",
+                  "[apprehensively]", "[troubled]"],
 }
-# Non-verbal reactions -- used sparingly (10% chance per sentence)
+
+# Non-verbal reactions & human sounds — placed MID-SENTENCE or POST-SENTENCE
+# for natural emotional beats (sighs, gulps, laughs, etc.)
+# Used at ~15-25% probability on any given sentence
 _REACTION_TAGS = {
-    "happy":     ["[laughs]", "[chuckles]"],
-    "excited":   ["[laughs]", "[gasps]"],
-    "surprised": ["[gasps]"],
-    "sad":       ["[sighs]", "[sniffles]"],
-    "angry":     ["[snorts]"],
-    "afraid":    ["[gulps]", "[whispers]"],
-    "disgusted": ["[shudders]", "[sighs]"],
-    "calm":      ["[sighs contentedly]", "[exhales]"],
-    "neutral":   ["[clears throat]"],
-    "worried":   ["[sighs]", "[nervous laugh]", "[gulps]"],
+    "happy":     ["[laughs]", "[chuckles]", "[giggles]", "[light chuckle]"],
+    "excited":   ["[laughs]", "[gasps]", "[exhales sharply]", "[laughing]"],
+    "surprised": ["[gasps]", "[gulps]", "[sharp inhale]", "[exhales]"],
+    "sad":       ["[sighs]", "[sniffles]", "[quiet exhale]", "[sigh]",
+                  "[voice catches]"],
+    "angry":     ["[snorts]", "[growls]", "[huffs]", "[grumbles]"],
+    "afraid":    ["[gulps]", "[whispers]", "[stammers]", "[trembling]",
+                  "[shaky breath]"],
+    "disgusted": ["[shudders]", "[sighs]", "[groans]", "[scoffs]"],
+    "calm":      ["[sighs contentedly]", "[exhales]", "[gentle exhale]",
+                  "[soft chuckle]"],
+    "neutral":   ["[clears throat]", "[pause]", "[slight pause]"],
+    "worried":   ["[sighs]", "[nervous laugh]", "[gulps]", "[stammers]",
+                  "[hesitates]", "[shaky exhale]"],
+}
+
+# Pacing/hesitation tags — used at natural break points
+# Placed BEFORE a sentence or MID-SENTENCE at hesitation points
+_PACING_TAGS = {
+    "sad":       ["[hesitates]", "[pause]", "[quietly]"],
+    "afraid":    ["[stammers]", "[hesitates]", "[pause]", "[trembling]"],
+    "worried":   ["[hesitates]", "[pause]", "[stammers]", "[uncertain]"],
+    "surprised": ["[pause]", "[stammers]", "[incredulously]"],
+    "disgusted": ["[pause]", "[scoffs]"],
+    "neutral":   ["[pause]", "[thoughtfully]"],
+    # happy, excited, angry, calm typically don't need pacing tags
 }
 
 # Cache helpers
@@ -124,18 +167,24 @@ def tts(text, voice_id, emotion):
             yield chunk
 
 def _apply_audio_tags(text: str, emotion: str) -> str:
-    """Sprinkle emotion-appropriate audio tags through the text.
+    """Apply ElevenLabs v3 audio tags using 2025/2026 best practices.
 
-    Best practices from ElevenLabs docs:
-    - One tag per sentence is enough (too many = forced/unnatural)
-    - Match tags to the voice's character (Emory = warm, not aggressive)
-    - First sentence gets the strongest tag, rest get lighter touches
-    - Non-verbal reactions (sighs, laughs) used sparingly (~15%)
+    Strategy (per ElevenLabs docs):
+      - Each tag affects ~4-5 words, then delivery returns to baseline.
+        This means we CAN use multiple tags per sentence at emotional
+        shift points — they don't stack unnaturally.
+      - Prepend tags for sentence-level emotional framing.
+      - Postpend non-verbal reactions (sighs, laughs) for natural beats.
+      - Mid-sentence tags at hesitation / emotional-shift points.
+      - Sparse coverage: 50-65% of sentences, not every one.
+      - Layer emotion + non-verbal: "[sad][sighs] I don't know..."
+      - Match tone to Sarah: warm, professional — avoid harsh/aggressive combos.
     """
-    tags = EMOTION_TAGS.get(emotion, ["[thoughtfully]"])
-    if not tags:
-        return text
+    emotion_tags = EMOTION_TAGS.get(emotion, ["[thoughtfully]"])
+    reaction_tags = _REACTION_TAGS.get(emotion, [])
+    pacing_tags = _PACING_TAGS.get(emotion, [])
 
+    # --- split into sentences -------------------------------------------------
     sentences = []
     current = ""
     for ch in text:
@@ -149,21 +198,70 @@ def _apply_audio_tags(text: str, emotion: str) -> str:
     if not sentences:
         return text
 
+    # --- tag each sentence ----------------------------------------------------
     tagged_parts = []
     for i, sentence in enumerate(sentences):
+        # ---- determine coverage for this sentence ----
+        # First sentence always gets emotional framing.
+        # Others get 50-65% coverage for natural variation.
         if i == 0:
-            # First sentence: single strong tag (not double — double
-            # tags can cause the voice to "break" between registers)
-            tag = random.choice(tags)
-            tagged_parts.append(f"{tag} {sentence}")
+            tag_it = True
         else:
-            # Subsequent sentences: lighter tagging
-            if random.random() < 0.8:
-                # 80% of sentences get a tag — but a milder one
-                tag = random.choice(tags)
-                tagged_parts.append(f"{tag} {sentence}")
+            tag_it = random.random() < 0.55  # ~55% coverage
+
+        if not tag_it:
+            tagged_parts.append(sentence)
+            continue
+
+        # ---- build tags for this sentence ----
+        chosen_tags = []
+
+        # Emotional direction tag (prepend — frames the sentence)
+        etag = random.choice(emotion_tags)
+        chosen_tags.append(etag)
+
+        # Non-verbal reaction (prepend or postpend based on type)
+        if reaction_tags and random.random() < 0.20:
+            rtag = random.choice(reaction_tags)
+            # Reactions like [laughs], [sighs], [gasps] work well AFTER
+            # the sentence. Others like [whispers], [gulps] work before.
+            post_reactions = {"[laughs]", "[chuckles]", "[giggles]",
+                              "[sighs]", "[sigh]", "[sniffles]",
+                              "[gasps]", "[groans]", "[scoffs]",
+                              "[grumbles]", "[huffs]", "[shudders]",
+                              "[snorts]", "[growls]", "[exhales]",
+                              "[light chuckle]", "[soft chuckle]",
+                              "[quiet exhale]", "[gentle exhale]",
+                              "[nervous laugh]", "[shaky exhale]",
+                              "[exhales sharply]", "[sharp inhale]",
+                              "[shaky breath]", "[voice catches]",
+                              "[laughing]", "[sighs contentedly]"}
+            if rtag.strip("[]") in {t.strip("[]") for t in post_reactions}:
+                chosen_tags.append(("POST", rtag))
             else:
-                # 20% get no tag — lets the voice settle naturally
-                tagged_parts.append(sentence)
+                chosen_tags.append(rtag)
+
+        # Pacing/hesitation tag — randomly inserted for hesitant emotions
+        if pacing_tags and random.random() < 0.15:
+            ptag = random.choice(pacing_tags)
+            # [hesitates], [stammers], [pause] work best mid-sentence
+            # Place them between words in the first half of the sentence
+            words = sentence.split()
+            if len(words) >= 4:
+                insert_at = random.randint(1, min(3, len(words) - 1))
+                words.insert(insert_at, ptag)
+                sentence = " ".join(words)
+                # Don't add to chosen_tags since we baked it inline
+            else:
+                chosen_tags.append(ptag)
+
+        # ---- assemble: prepend tags + sentence + postpend tags ----
+        pre_tags = [t for t in chosen_tags if not isinstance(t, tuple)]
+        post_tags = [t[1] for t in chosen_tags if isinstance(t, tuple)]
+
+        prefix = "".join(pre_tags) + " " if pre_tags else ""
+        suffix = " " + "".join(post_tags) if post_tags else ""
+
+        tagged_parts.append(f"{prefix}{sentence}{suffix}")
 
     return " ".join(tagged_parts)

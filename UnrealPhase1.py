@@ -1,3 +1,4 @@
+import os
 from emotion_game.npc_introduce import npc_introduce, agree_check, player_disagreed
 from emotion_game.npc_describe_emotion import npc_describe_emotion
 from emotion_game.player_guess import player_guess
@@ -32,7 +33,7 @@ currentScene = """
         "This feeling…", "What I’m feeling now…", or
         "The way my body feels right now…"
 """
-voiceId = "BIvP0GN1cAtSRTxNHnWS"
+voiceId = os.environ.get("NPC_VOICE_ID", "EXAVITQu4vr4xnSDxMaL")  # Sarah by default
 SERVER  = "http://localhost:5001"
 active_turns = {} # this will be persistent for the lifetime of the socketio instance
 turn = EmotionGameTurn(
@@ -63,7 +64,12 @@ def assignEmotion(turn, sio):
     npc_describe_emotion(turn, sio=sio)
     turn.guessing_started = True
 # -----------------------------------------------------------------------------------
-def start_game(sio):
+def start_game(sio, player_name: str = None):
+    if player_name is None:
+        player_name = os.environ.get("PLAYER_NAME", "Gabriel")
+
+    # Set the player name on the turn (from register_user or default)
+    turn.player_name = player_name
 
     # Acquire the turn lock so no emotion clicks sneak in during intro
     if not turn._lock.acquire(blocking=False):
