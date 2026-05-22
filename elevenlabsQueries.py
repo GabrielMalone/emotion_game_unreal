@@ -29,24 +29,25 @@ _eleven = ElevenLabs(
     httpx_client=http_client,
 )
 
-# Per-emotion VoiceSettings — TUNED FOR EXTREME EXPRESSIVENESS
-# stability: 0.20-0.32 — very low for maximum emotional variation
-#            (expect occasional wobble; worth it for game character)
-# style:     0.35-0.55 — high character/stylisation
-# speed:     wider emotional range
+# Per-emotion VoiceSettings — TUNED FOR eleven_turbo_v2_5
+# Turbo v2.5 balances ~250ms latency with high-fidelity emotional delivery.
+# stability: 0.32-0.48 — low enough for emotional variation,
+#            high enough to avoid streaming artifacts on Turbo
+# style:     0.28-0.48 — character/stylisation (Turbo handles well)
+# speed:     wide emotional range (0.80-1.30)
 EMOTION_VOICE_SETTINGS = {
-    "happy":     VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.50, speed=1.10, use_speaker_boost=True),
-    "excited":   VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.55, speed=1.25, use_speaker_boost=True),
-    "surprised": VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.50, speed=1.15, use_speaker_boost=True),
-    "sad":       VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.40, speed=0.82, use_speaker_boost=True),
-    "angry":     VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.55, speed=1.30, use_speaker_boost=True),
-    "afraid":    VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.45, speed=1.10, use_speaker_boost=True),
-    "disgusted": VoiceSettings(stability=0.25, similarity_boost=0.75, style=0.45, speed=0.90, use_speaker_boost=True),
-    "calm":      VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.40, speed=0.88, use_speaker_boost=True),
-    "neutral":   VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.35, speed=1.00, use_speaker_boost=True),
-    "worried":   VoiceSettings(stability=0.25, similarity_boost=0.75, style=0.42, speed=0.92, use_speaker_boost=True),
+    "happy":     VoiceSettings(stability=0.34, similarity_boost=0.75, style=0.45, speed=1.10, use_speaker_boost=True),
+    "excited":   VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.48, speed=1.25, use_speaker_boost=True),
+    "surprised": VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.45, speed=1.15, use_speaker_boost=True),
+    "sad":       VoiceSettings(stability=0.42, similarity_boost=0.75, style=0.35, speed=0.82, use_speaker_boost=True),
+    "angry":     VoiceSettings(stability=0.33, similarity_boost=0.75, style=0.48, speed=1.28, use_speaker_boost=True),
+    "afraid":    VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.40, speed=1.10, use_speaker_boost=True),
+    "disgusted": VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.40, speed=0.90, use_speaker_boost=True),
+    "calm":      VoiceSettings(stability=0.45, similarity_boost=0.75, style=0.32, speed=0.88, use_speaker_boost=True),
+    "neutral":   VoiceSettings(stability=0.48, similarity_boost=0.75, style=0.28, speed=1.00, use_speaker_boost=True),
+    "worried":   VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.38, speed=0.92, use_speaker_boost=True),
 }
-_DEFAULT_VOICE_SETTINGS = VoiceSettings(stability=0.25, similarity_boost=0.75, style=0.40, speed=1.0, use_speaker_boost=True)
+_DEFAULT_VOICE_SETTINGS = VoiceSettings(stability=0.40, similarity_boost=0.75, style=0.32, speed=1.0, use_speaker_boost=True)
 
 # ==================================================================
 # Audio tag vocabularies per emotion (2025/2026 ElevenLabs best practices)
@@ -57,7 +58,7 @@ _DEFAULT_VOICE_SETTINGS = VoiceSettings(stability=0.25, similarity_boost=0.75, s
 #   - Post-sentence reactions often sound more natural than pre-sentence
 #   - Layer emotion + non-verbal: "[sad][sighs] I don't know..."
 #   - Use ellipses + punctuation WITH tags for pacing/hesitation
-#   - Match tags to voice character — Sarah is warm, professional, young
+#   - Match tags to voice character — Amelia is young, British, expressive
 #   - Sparse is better: 40-60% coverage, not every sentence
 # ==================================================================
 
@@ -159,7 +160,7 @@ def tts(text, voice_id, emotion):
     audio_stream = _eleven.text_to_speech.convert(
         voice_id=voice_id,
         text=tagged_text,
-        model_id="eleven_v3",
+        model_id="eleven_turbo_v2_5",  # ~250ms TTFB — best quality/latency for streaming
         voice_settings=voice_settings,
     )
     for chunk in audio_stream:
@@ -178,7 +179,7 @@ def _apply_audio_tags(text: str, emotion: str) -> str:
       - Mid-sentence tags at hesitation / emotional-shift points.
       - Sparse coverage: 50-65% of sentences, not every one.
       - Layer emotion + non-verbal: "[sad][sighs] I don't know..."
-      - Match tone to Sarah: warm, professional — avoid harsh/aggressive combos.
+      - Match tone to Amelia: young, enthusiastic — avoid harsh/aggressive combos.
     """
     emotion_tags = EMOTION_TAGS.get(emotion, ["[thoughtfully]"])
     reaction_tags = _REACTION_TAGS.get(emotion, [])
