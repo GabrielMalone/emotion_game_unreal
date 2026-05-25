@@ -34,13 +34,13 @@ _eleven = ElevenLabs(
 # stability: 0.32-0.48 — low enough for emotional variation,
 #            high enough to avoid streaming artifacts on Turbo
 # style:     0.28-0.48 — character/stylisation (Turbo handles well)
-# speed:     wide emotional range (0.80-1.30)
+# speed:     Turbo range clamp (0.70-1.20) — v3 allowed wider but Turbo caps at 1.2
 EMOTION_VOICE_SETTINGS = {
     "happy":     VoiceSettings(stability=0.34, similarity_boost=0.75, style=0.45, speed=1.10, use_speaker_boost=True),
-    "excited":   VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.48, speed=1.25, use_speaker_boost=True),
+    "excited":   VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.48, speed=1.20, use_speaker_boost=True),
     "surprised": VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.45, speed=1.15, use_speaker_boost=True),
     "sad":       VoiceSettings(stability=0.42, similarity_boost=0.75, style=0.35, speed=0.82, use_speaker_boost=True),
-    "angry":     VoiceSettings(stability=0.33, similarity_boost=0.75, style=0.48, speed=1.28, use_speaker_boost=True),
+    "angry":     VoiceSettings(stability=0.33, similarity_boost=0.75, style=0.48, speed=1.20, use_speaker_boost=True),
     "afraid":    VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.40, speed=1.10, use_speaker_boost=True),
     "disgusted": VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.40, speed=0.90, use_speaker_boost=True),
     "calm":      VoiceSettings(stability=0.45, similarity_boost=0.75, style=0.32, speed=0.88, use_speaker_boost=True),
