@@ -29,23 +29,22 @@ _eleven = ElevenLabs(
     httpx_client=http_client,
 )
 
-# Per-emotion VoiceSettings — TUNED FOR eleven_turbo_v2_5
-# Turbo v2.5 balances ~250ms latency with high-fidelity emotional delivery.
-# stability: 0.32-0.48 — low enough for emotional variation,
-#            high enough to avoid streaming artifacts on Turbo
-# style:     0.28-0.48 — character/stylisation (Turbo handles well)
-# speed:     Turbo range clamp (0.70-1.20) — v3 allowed wider but Turbo caps at 1.2
+# Per-emotion VoiceSettings — TUNED FOR eleven_v3
+# v3 interprets [bracket tags] natively as performance cues.
+# stability: 0.30-0.50 — v3 handles low stability better than Turbo
+# style:     0.30-0.55 — v3 responds well to style/exaggeration
+# speed:     v3 range is wider (0.70-2.00); excited/angry can push past 1.2
 EMOTION_VOICE_SETTINGS = {
-    "happy":     VoiceSettings(stability=0.34, similarity_boost=0.75, style=0.45, speed=1.10, use_speaker_boost=True),
-    "excited":   VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.48, speed=1.20, use_speaker_boost=True),
-    "surprised": VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.45, speed=1.15, use_speaker_boost=True),
-    "sad":       VoiceSettings(stability=0.42, similarity_boost=0.75, style=0.35, speed=0.82, use_speaker_boost=True),
-    "angry":     VoiceSettings(stability=0.33, similarity_boost=0.75, style=0.48, speed=1.20, use_speaker_boost=True),
-    "afraid":    VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.40, speed=1.10, use_speaker_boost=True),
-    "disgusted": VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.40, speed=0.90, use_speaker_boost=True),
-    "calm":      VoiceSettings(stability=0.45, similarity_boost=0.75, style=0.32, speed=0.88, use_speaker_boost=True),
-    "neutral":   VoiceSettings(stability=0.48, similarity_boost=0.75, style=0.28, speed=1.00, use_speaker_boost=True),
-    "worried":   VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.38, speed=0.92, use_speaker_boost=True),
+    "happy":     VoiceSettings(stability=0.34, similarity_boost=0.75, style=0.50, speed=1.10, use_speaker_boost=True),
+    "excited":   VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.55, speed=1.30, use_speaker_boost=True),
+    "surprised": VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.50, speed=1.20, use_speaker_boost=True),
+    "sad":       VoiceSettings(stability=0.42, similarity_boost=0.75, style=0.40, speed=0.82, use_speaker_boost=True),
+    "angry":     VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.55, speed=1.35, use_speaker_boost=True),
+    "afraid":    VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.45, speed=1.10, use_speaker_boost=True),
+    "disgusted": VoiceSettings(stability=0.36, similarity_boost=0.75, style=0.45, speed=0.92, use_speaker_boost=True),
+    "calm":      VoiceSettings(stability=0.48, similarity_boost=0.75, style=0.35, speed=0.88, use_speaker_boost=True),
+    "neutral":   VoiceSettings(stability=0.48, similarity_boost=0.75, style=0.30, speed=1.00, use_speaker_boost=True),
+    "worried":   VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.42, speed=0.95, use_speaker_boost=True),
 }
 _DEFAULT_VOICE_SETTINGS = VoiceSettings(stability=0.40, similarity_boost=0.75, style=0.32, speed=1.0, use_speaker_boost=True)
 
@@ -160,7 +159,7 @@ def tts(text, voice_id, emotion):
     audio_stream = _eleven.text_to_speech.convert(
         voice_id=voice_id,
         text=tagged_text,
-        model_id="eleven_turbo_v2_5",  # ~250ms TTFB — best quality/latency for streaming
+        model_id="eleven_v3",  # native [bracket tag] support — tags control delivery, not spoken
         voice_settings=voice_settings,
     )
     for chunk in audio_stream:
