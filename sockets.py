@@ -68,8 +68,11 @@ def init_socket_events(app):
 
     @sio.on("register_user")
     def register_user(data=None):
+        player_name = None
+        if data and data.get("player_name", "").strip():
+            player_name = data["player_name"].strip()
         join_room(f"user:{idUser}")   # THIS WAS MISSING
-        start_game(sio=sio)
+        start_game(sio=sio, player_name=player_name)
     #--------------------------------------------------------------
     # from unreal socket emit event
     # get the player's input
@@ -79,10 +82,12 @@ def init_socket_events(app):
             print("[player_input] received empty data, ignoring")
             return
         turn = active_turns[idUser]
-        # Ignore input while NPC is already speaking/streaming
-        if turn.streaming:
-            print("[player_input] ignored — NPC already speaking")
-            return
+        # Kill any in-flight TTS immediately — player is interacting,
+        # don't make them wait for old audio to finish.
+        turn.cancel_stream = True
+        sio.emit("npc_audio_stop", {}, room=f"user:{turn.idUser}")
+        print("[player_input] cancel_stream set, npc_audio_stop emitted")
+
         advance_game(turn, data.get("player_text", ""), data.get("last_npc_text", ""), sio=sio)
         #--------------------------------------------------------------
     # ---------------------------------------------------------------
