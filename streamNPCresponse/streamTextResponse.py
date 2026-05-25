@@ -61,6 +61,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             and sentence_buffer.strip()[-1] in SENTENCE_END
         ):
             # Strip emotion tags so Unreal gets clean text for CC display
+            # AND so ElevenLabs doesn't read stage directions aloud
             clean_sentence = _strip_tags(sentence_buffer)
 
             # Send keepalive before audio processing
@@ -74,7 +75,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
 
             audio_buf = b""
             for audio_chunk in tts_cached(
-                sentence_buffer, t.voiceId, t.cur_npc_emotion
+                clean_sentence, t.voiceId, t.cur_npc_emotion
             ):
                 if t.cancel_stream:
                     _emit("npc_audio_stop")
@@ -109,7 +110,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
 
         audio_buf = b""
         for audio_chunk in tts_cached(
-            sentence_buffer, t.voiceId, t.cur_npc_emotion
+            clean_sentence, t.voiceId, t.cur_npc_emotion
         ):
             if t.cancel_stream:
                 _emit("npc_audio_stop")
