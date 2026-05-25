@@ -34,13 +34,21 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             t.cancel_stream = True
             return False
 
+    # Tell Unreal to flush any queued audio from a previous stream
+    # BEFORE we start emitting new chunks. This prevents old TTS from
+    # playing over new dialogue when the player skips ahead.
+    _emit("npc_audio_stop")
+    sio.sleep(0)
+
     # ----------------------------------------------------------
     # stream text + audio (closed-captioning style)
     # ----------------------------------------------------------
     for token in openAIqueries.getResponseStream(t, client):
         # --- player walked away or socket died? abort immediately ---
         if t.cancel_stream:
+            _emit("npc_audio_stop")
             _emit("stream_cancelled")
+            t.streaming = False
             return "".join(full_text)
 
         full_text.append(token)
@@ -69,7 +77,9 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
                 sentence_buffer, t.voiceId, t.cur_npc_emotion
             ):
                 if t.cancel_stream:
+                    _emit("npc_audio_stop")
                     _emit("stream_cancelled")
+                    t.streaming = False
                     return "".join(full_text)
 
                 audio_buf += audio_chunk
@@ -102,7 +112,9 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             sentence_buffer, t.voiceId, t.cur_npc_emotion
         ):
             if t.cancel_stream:
+                _emit("npc_audio_stop")
                 _emit("stream_cancelled")
+                t.streaming = False
                 return "".join(full_text)
 
             audio_buf += audio_chunk
