@@ -29,7 +29,7 @@ currentScene = """
         "This feeling…", "What I’m feeling now…", or
         "The way my body feels right now…"
 """
-voiceId = "BIvP0GN1cAtSRTxNHnWS"
+voiceId = "ZF6FPAbjXT4488VcRRnw"  # Amelia — young British, enthusiastic & expressive
 SERVER = "http://localhost:5001"
 # -----------------------------------------------------------------------------------
 # socket extension
