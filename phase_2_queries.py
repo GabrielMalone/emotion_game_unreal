@@ -4,10 +4,10 @@ from turnContext import EmotionGameTurn
 from db import connect
 
 #------------------------------------------------------------------
-def update_NPC_user_memory_query(t: EmotionGameTurn):
+def update_NPC_user_memory_query(idNPC: int, idUser: int, kbText: str):
     db = connect()
     if not db.is_connected():
-        return
+        return jsonify({"status": "error", "message": "database unavailable"}), 503
     try:
         cursor = db.cursor()
         query = """
@@ -23,7 +23,7 @@ def update_NPC_user_memory_query(t: EmotionGameTurn):
                 ),
                 updatedAt = NOW();
         """
-        cursor.execute(query, (t.idNPC, t.idUser, t.npc_memory))
+        cursor.execute(query, (idNPC, idUser, kbText))
         db.commit()
         return jsonify({"status": "success"}), 200
     except mysql.connector.Error as err:

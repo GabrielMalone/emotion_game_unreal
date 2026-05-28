@@ -4,22 +4,9 @@ from elevenlabs.client import ElevenLabs
 from elevenlabs.types import VoiceSettings
 from dotenv import load_dotenv
 import hashlib
-from streamingMP3Player import StreamingMP3Player
-
 load_dotenv(".env")
 AUDIO_DIR = "./tts_cache"
 os.makedirs(AUDIO_DIR, exist_ok=True)
-
-LOCAL_PLAYBACK = os.getenv("TTS_LOCAL_PLAYBACK", "0") == "1"
-_active_players = []
-
-def _new_player_if_enabled():
-    if not LOCAL_PLAYBACK:
-        return None
-    p = StreamingMP3Player()
-    _active_players.append(p)
-    p.on_drain = lambda p=p: _active_players.remove(p) if p in _active_players else None
-    return p
 
 http_client = httpx.Client(timeout=240, follow_redirects=True)
 

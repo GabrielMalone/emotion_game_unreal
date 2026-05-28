@@ -105,7 +105,7 @@ def classify_emotion_guess(t: EmotionGameTurn, client):
         "- sad\n"
         "- angry\n"
         "- afraid\n"
-        "- surpised\n"
+        "- surprised\n"
         "- calm\n"
         "- excited\n"
         "- disgusted\n\n"
