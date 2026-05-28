@@ -1,12 +1,24 @@
 import os
 import subprocess
 import threading
-import pyaudio
+
+try:
+    import pyaudio
+    _HAS_PYAUDIO = True
+except ImportError:
+    _HAS_PYAUDIO = False
 
 
 class StreamingMP3Player:
     def __init__(self):
         self.on_drain = None  # callback set by client
+        self._closed = False
+
+        if not _HAS_PYAUDIO:
+            print("[StreamingMP3Player] WARNING: pyaudio not installed — audio output disabled.")
+            self.stream = None
+            self.audio = None
+            return
 
         ffmpeg_bin = os.getenv("FFMPEG_BIN", "ffmpeg")
         self.proc = subprocess.Popen(
@@ -32,7 +44,6 @@ class StreamingMP3Player:
             output=True,
         )
 
-        self._closed = False
         self._play_thread = threading.Thread(
             target=self._play_loop, daemon=True
         )
@@ -61,10 +72,14 @@ class StreamingMP3Player:
 
         if mp3_bytes is None:
             self._closed = True
-            try:
-                self.proc.stdin.close()  # tells ffmpeg no more input
-            except Exception:
-                pass
+            if hasattr(self, 'proc'):
+                try:
+                    self.proc.stdin.close()  # tells ffmpeg no more input
+                except Exception:
+                    pass
+            return
+
+        if not _HAS_PYAUDIO:
             return
 
         try:
@@ -78,24 +93,28 @@ class StreamingMP3Player:
     # --------------------------------------------------
     def close(self):
         if not self._closed:
-            try:
-                self.proc.stdin.close()
-            except Exception:
-                pass
+            if hasattr(self, 'proc'):
+                try:
+                    self.proc.stdin.close()
+                except Exception:
+                    pass
             self._closed = True
 
-        try:
-            self.proc.wait(timeout=1)
-        except Exception:
-            pass
+        if hasattr(self, 'proc'):
+            try:
+                self.proc.wait(timeout=1)
+            except Exception:
+                pass
 
-        try:
-            self.stream.stop_stream()
-            self.stream.close()
-        except Exception:
-            pass
+        if self.stream:
+            try:
+                self.stream.stop_stream()
+                self.stream.close()
+            except Exception:
+                pass
 
-        try:
-            self.audio.terminate()
-        except Exception:
-            pass
+        if self.audio:
+            try:
+                self.audio.terminate()
+            except Exception:
+                pass

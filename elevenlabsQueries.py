@@ -21,8 +21,7 @@ def _new_player_if_enabled():
     p.on_drain = lambda p=p: _active_players.remove(p) if p in _active_players else None
     return p
 
-PROXY_URL = os.getenv("SOCKS_PROXY", "socks5://127.0.0.1:1080")
-http_client = httpx.Client(proxy=PROXY_URL, timeout=240, follow_redirects=True)
+http_client = httpx.Client(timeout=240, follow_redirects=True)
 
 _eleven = ElevenLabs(
     api_key=os.getenv("ELEVENLABS_API_KEY"),

@@ -30,3 +30,8 @@ reports/
 # Streaming audio
 *.mp3
 *.wav
+
+# Logs
+*.log
+server_log.txt
+socket_debug.log

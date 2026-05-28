@@ -1,6 +1,9 @@
 @echo off
 cd /d "%~dp0"
 
+:: Add MySQL to PATH (not on system PATH by default)
+set "PATH=C:\mysql\bin;%PATH%"
+
 echo ================================================================
 echo   emotionGame Startup Script
 echo ================================================================
@@ -9,7 +12,7 @@ echo.
 :: ------------------------------------------------------------------
 :: 1. Parse .env for secrets
 :: ------------------------------------------------------------------
-echo [1/3] Reading .env ...
+echo [1/2] Reading .env ...
 if not exist ".env" (
     echo   ERROR: .env file not found in %cd%
     pause
@@ -31,35 +34,10 @@ if "%DB_HOST%"=="" set "DB_HOST=localhost"
 echo   DB: %DB_USER%@%DB_HOST%/%DB_NAME%
 
 :: ------------------------------------------------------------------
-:: 2. Start SSH SOCKS proxy (skip if already running)
+:: 2. Reset database to initial state
 :: ------------------------------------------------------------------
 echo.
-echo [2/3] SSH SOCKS proxy ...
-
-:: Check if something is already listening on port 1080
-netstat -ano 2>nul | findstr ":1080 " | findstr "LISTENING" >nul
-if not errorlevel 1 (
-    echo   Proxy already running on port 1080 -- skipping.
-    goto :skip_proxy
-)
-
-set "SSH_KEY=%USERPROFILE%\gabekey"
-if not exist "%SSH_KEY%" (
-    echo   WARNING: SSH key not found at %SSH_KEY%
-    echo   Skipping proxy. Start it manually:
-    echo     ssh -i %SSH_KEY% -D 1080 gabriel@172.31.2.42
-) else (
-    start "emotionGame-SSH-Proxy" /min ssh -i "%SSH_KEY%" -D 1080 gabriel@172.31.2.42
-    echo   SSH proxy launched in background ^(port 1080^)
-    timeout /t 3 /nobreak >nul
-)
-:skip_proxy
-
-:: ------------------------------------------------------------------
-:: 3. Reset database to initial state
-:: ------------------------------------------------------------------
-echo.
-echo [3/3] Resetting camodb to initial state ...
+echo [2/2] Resetting camodb to initial state ...
 
 set "SQL_FILE=database\camodb_phase1.sql"
 if not exist "%SQL_FILE%" (
@@ -95,7 +73,7 @@ del "%MYSQL_ERR%" 2>nul
 echo   Database reset complete.
 
 :: ------------------------------------------------------------------
-:: 4. Start camo_server.py using the egvenv Python directly
+:: 3. Start camo_server.py using the egvenv Python directly
 :: ------------------------------------------------------------------
 echo.
 echo ================================================================
