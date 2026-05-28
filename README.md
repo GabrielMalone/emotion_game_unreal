@@ -1,66 +1,61 @@
 # emotionGame
 
-A Flask + SocketIO backend for an Unreal Engine emotional intelligence game
-where a player helps an NPC who has "lost the ability to name emotions."
-The player guesses what emotion the NPC is feeling based on body sensations,
-behavioral cues, and conversational context.
+A Flask + SocketIO backend for an Unreal Engine 5 emotional intelligence game.
+An NPC has lost the ability to name emotions — the player helps by guessing what
+they're feeling based on body sensations, behavioral cues, and conversation.
 
 ## Architecture
 
 ```
                      Unreal Engine 5 (C++ client)
-                              |
+                              │
                        SocketIO (ws)
-                              |
-                  +-----------+-----------+
-                  |   camo_server.py      |  Flask entry point (port 5001)
-                  |   sockets.py          |  SocketIO event handlers
-                  +-----------+-----------+
-                              |
-        +---------------------+---------------------+
-        |                     |                      |
-   +----+--------+    +------+------+    +----------+----------+
-   |UnrealPhase1 |    | openAI      |    | emotionGameQueries  |
-   |(game state  |    | queries.py  |    | (DB: emotion guess) |
-   | machine)    |    | (LLM calls) |    +---------------------+
-   +----+--------+    +------+------+
-        |                     |
-   +----+--------+           |            +------------------+
-   |emotion_game/|           |            | phase_2_queries  |
-   |- npc_intro  |           |            | (storylets,      |
-   |- npc_descr  |           |            |  tasks, invent)  |
-   |- player_gss |           |            +------------------+
-   |- build_*prmpt|          |
-   |- get_NPC_mem|           |
-   +----+--------+    +------+------+    +------------------+
-        |             | OpenAI API  |    | ElevenLabs TTS   |
-        |             | (GPT-4o,    |    | API              |
-        |             |  GPT-4o-mini|    +--------+---------+
-        |             +-------------+             |
-   +----+--------+                       +--------+---------+
-   |streamNPCresp|                       | tts_cache/       |
-   |streamText   |-----------------------+ (cached .mp3)    |
-   |(text + TTS) |                       +------------------+
-   +-------------+
-        |
-   +----+--------+            +--------------------------+
-   | db.py       |----------->| MySQL (camodb)           |
-   | (connection |            | - emotion_guess_game     |
-   |  pool, ctx) |            | - npc_user_memory        |
-   +-------------+            | - storylets, NPCs, tasks |
-                              +--------------------------+
+                              │
+                  ┌───────────┴───────────┐
+                  │   camo_server.py      │  Flask entry point (port 5001)
+                  │   sockets.py          │  SocketIO event handlers
+                  └───────────┬───────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                      │
+   ┌────┴────────┐    ┌──────┴──────┐    ┌──────────┴──────────┐
+   │UnrealPhase1 │    │ openAI      │    │ emotionGameQueries  │
+   │(game state  │    │ queries.py  │    │ (DB: emotion guess) │
+   │ machine)    │    │ (LLM calls) │    └──────────┬──────────┘
+   └────┬────────┘    └──────┬──────┘               │
+        │                    │                ┌──────┴──────┐
+   ┌────┴────────┐    ┌──────┴──────┐    ┌────┴──────────┐
+   │emotion_game/│    │ OpenAI API  │    │ ElevenLabs TTS │
+   │▪ npc_intro  │    │ GPT-4o      │    │ eleven_v3      │
+   │▪ npc_descr  │    │ GPT-4o-mini │    │ (Charlotte)    │
+   │▪ player_gss │    └─────────────┘    └───────┬────────┘
+   │▪ build_*    │                               │
+   └────┬────────┘                        ┌──────┴──────┐
+        │                                 │ tts_cache/  │
+   ┌────┴────────┐                        │ (.mp3 files)│
+   │streamNPCres │                        └─────────────┘
+   │streamText   │
+   │(text + TTS) │
+   └────┬────────┘
+        │
+   ┌────┴────────┐    ┌─────────────────────────────────┐
+   │ db.py       │───▶│ MySQL (camodb)                  │
+   │(pool, ctx)  │    │ ▪ emotion_guess_game            │
+   └─────────────┘    │ ▪ npc_user_memory               │
+                      │ ▪ emotion, NPCs, storylets, etc │
+                      └─────────────────────────────────┘
 ```
 
 ## Tech Stack
 
-| Component   | Technology                |
-|-------------|---------------------------|
-| Backend     | Flask + Flask-SocketIO    |
-| LLM         | OpenAI GPT-4o / GPT-4o-mini |
-| TTS         | ElevenLabs                |
-| Database    | MySQL                     |
-| Client      | Unreal Engine 5 (C++)     |
-| Audio       | PyAudio + ffmpeg streaming |
+| Component  | Technology                    |
+|------------|-------------------------------|
+| Backend    | Flask 3 + Flask-SocketIO 5    |
+| LLM        | OpenAI GPT-4o / GPT-4o-mini   |
+| TTS        | ElevenLabs eleven_v3          |
+| Voice      | Charlotte (`XB0fDUnXU5powFXDhCwa`) |
+| Database   | MySQL 8 (connection pool, 5)  |
+| Client     | Unreal Engine 5 (C++)         |
 
 ## Setup
 
@@ -74,10 +69,10 @@ behavioral cues, and conversational context.
 ### 2. Install
 
 ```bash
-cd emotionGame-emotion-game-unreal-version
+cd emotion_game_unreal
 python -m venv egvenv
-egvenv\Scripts\activate       # Windows
-# source egvenv/bin/activate  # macOS/Linux
+source egvenv/bin/activate       # macOS/Linux
+# egvenv\Scripts\activate        # Windows
 pip install -r requirements.txt
 ```
 
@@ -85,18 +80,21 @@ pip install -r requirements.txt
 
 Create a `.env` file:
 
-```
+```env
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=yourpassword
 DB_NAME=camodb
 OPENAI_API_KEY=sk-...
 ELEVENLABS_API_KEY=sk_...
+
+# Optional overrides (defaults shown)
+NPC_VOICE_ID=XB0fDUnXU5powFXDhCwa    # Charlotte — ElevenLabs voice ID
+PLAYER_NAME=Gabriel                    # Default player name
+TTS_LOCAL_PLAYBACK=0                   # 1 = play audio locally via ffmpeg
 ```
 
 ### 4. Database
-
-Import the schema:
 
 ```bash
 mysql -u root -p < database/camodb_phase1.sql
@@ -109,93 +107,198 @@ python camo_server.py
 # Server starts on http://0.0.0.0:5001
 ```
 
-## API / SocketIO Events
-
-### HTTP Routes
-
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/tts_audio/<id>` | GET | Serve cached TTS audio file |
-| `/match_choice` | POST | Handle storylet choice selection |
-| `/update_NPC_user_mem` | POST | Update NPC memory of player |
-| `/get_NPC_user_mem` | POST | Retrieve NPC memory of player |
-
-### SocketIO Events (Client -> Server)
-
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `connect` | -- | Auto-connect, triggers test events |
-| `ping` | -- | Health check -> `pong` |
-| `register_user` | -- | Join room, start game |
-| `player_input` | `{player_text, last_npc_text}` | Player's guess or statement |
-| `player_stepped_away` | `{player_text, last_npc_text}` | Player left and returned |
-| `get_cur_emotion` | -- | Debug: get current NPC emotion |
-| `test_audio` | -- | Debug: test audio channel |
-
-### SocketIO Events (Server -> Client)
-
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `npc_text_token` | `{token}` | Streaming text token from NPC |
-| `npc_audio_chunk` | `{audio_chunk}` | Base64-encoded MP3 chunk |
-| `npc_responded` | `{text}` | Full NPC response complete |
-| `current_emotion` | string | Current NPC emotion name |
-| `correct` | `{num_correct}` | Correct guess count |
-| `keepalive` | -- | Connection keepalive |
-| `pong` | string | Ping response |
-| `test_connect` | `{msg}` | Connection test |
-
 ## Game Flow
 
 ```
-1. Player connects -> register_user -> start_game()
-2. NPC introduces self, asks for help
-3. Player agrees -> assignEmotion() -> NPC describes feeling
-4. Player guesses emotion -> classify_emotion_guess()
-   |-- Correct   -> mark_emotion_guessed_correct() -> next emotion
-   |-- Incorrect -> NPC gives hints, player tries again
-   |-- Other     -> NPC responds naturally (not a guess)
-   |-- All done  -> game_over -> NPC thanks player
-5. Player can step away and return -> state preserved
+CONNECT ──► start_game() auto-fires on connection
+  │
+  ├─► All emotions completed ──► game_over ──► NPC thanks player
+  ├─► Active emotion exists   ──► resume guessing from where left off
+  └─► Fresh game ──► npc_introduce() ──► NPC asks for help
+                          │
+                    Player responds
+                          │
+              ┌───────────┴───────────┐
+              ▼                       ▼
+         AGREES to help          REFUSES
+              │                       │
+    assignEmotion()             NPC asks again
+    (pick next unused                │
+     emotion from DB)          tries to convince
+              │
+    OpenAI generates 3 cues
+    (body sensations, behaviors,
+     everyday situations)
+              │
+    npc_describe_emotion()
+    (streaming text + TTS audio)
+              │
+       Player guesses
+              │
+    ┌─────────┼─────────┐
+    ▼         ▼          ▼
+ CORRECT  INCORRECT    OTHER
+    │         │          │
+ mark in   NPC gives   NPC responds
+ DB, get   hints,      naturally
+ next      try again   (not a guess)
+ emotion
+    │
+    └──► repeat until all 8 emotions done ──► game_over
 ```
+
+The player can disconnect and reconnect at any point — state is preserved in
+MySQL and the game resumes transparently.
+
+## SocketIO Events
+
+### Client → Server
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `connect` | — | Auto-joins room, calls `start_game()` |
+| `ping` | — | Health check → `pong` |
+| `register_user` | `{player_name?}` | Join room, start game with player name |
+| `player_input` | `{player_text, last_npc_text}` | Player sends text (guess, answer, or chat) |
+| `player_stepped_away` | `{player_text?, last_npc_text?}` | Player left and returned |
+| `get_cur_emotion` | — | Debug: query current active emotion |
+| `disconnect` | — | Sets `cancel_stream` flag, stops TTS |
+
+### Server → Client
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `npc_text_token` | `{token}` | Sentence of NPC dialogue (cleaned, no tags) |
+| `npc_audio_chunk` | `{audio_chunk}` | Base64-encoded MP3 chunk (32KB) |
+| `npc_audio_stop` | `{}` | Flush queued audio, stop playback |
+| `npc_responded` | `{}` | NPC response complete |
+| `send_cur_emotion` | string | Current NPC emotion name (broadcast) |
+| `correct` | `{num_correct}` | Running count of correct guesses |
+| `stream_cancelled` | `{}` | Stream aborted (player walked away) |
+| `keepalive` | `{}` | Connection keepalive |
+| `pong` | `"HELLO_FROM_FLASK"` | Ping response |
+
+## HTTP Routes
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/tts_audio/<audio_id>` | GET | Serve cached TTS .mp3 file |
+| `/match_choice` | POST | Handle storylet choice selection (phase 2) |
+| `/update_NPC_user_mem` | POST | `{idNPC, idUser, kbText}` — update NPC memory |
+| `/get_NPC_user_mem` | POST | `{idNPC, idUser}` — retrieve NPC memory |
+
+## TTS: ElevenLabs v3 + Charlotte
+
+The NPC voice is **Charlotte** (`XB0fDUnXU5powFXDhCwa`) — chosen for natural,
+emotionally expressive delivery on the eleven_v3 model.
+
+### Voice settings per emotion
+
+Stability is tuned into the 0.18–0.35 "creative" range where `[bracket tags]`
+have the most impact. Charlotte handles low stability without artifacts.
+
+| Emotion   | Stability | Style | Speed |
+|-----------|-----------|-------|-------|
+| happy     | 0.22      | 0.55  | 1.10  |
+| excited   | 0.18      | 0.60  | 1.30  |
+| surprised | 0.20      | 0.55  | 1.20  |
+| sad       | 0.28      | 0.45  | 0.82  |
+| angry     | 0.18      | 0.60  | 1.35  |
+| afraid    | 0.22      | 0.50  | 1.10  |
+| disgusted | 0.24      | 0.50  | 0.92  |
+| calm      | 0.32      | 0.38  | 0.88  |
+| neutral   | 0.35      | 0.32  | 1.00  |
+| worried   | 0.25      | 0.48  | 0.95  |
+
+Audio is cached to `tts_cache/` keyed by `sha256(voice_id | emotion | text)`.
+
+### Audio tags
+
+The `_apply_audio_tags()` function wraps NPC dialogue with ElevenLabs v3
+`[bracket tags]` for emotional delivery:
+
+- **Emotion direction** — prepended to ~55% of sentences (e.g. `[warmly]`,
+  `[sadly]`, `[frustrated]`)
+- **Non-verbal reactions** — 20% chance per sentence, post-pended
+  (e.g. `[sighs]`, `[laughs]`, `[gulps]`)
+- **Pacing/hesitation** — 15% chance, mid-sentence insertion for hesitant
+  emotions (e.g. `[hesitates]`, `[stammers]`, `[pause]`)
+
+Tags are stripped from the text sent to Unreal for closed-caption display.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `camo_server.py` | Flask entry point, HTTP routes |
-| `sockets.py` | SocketIO event handlers |
-| `UnrealPhase1.py` | Game state machine (start/advance/assign) |
-| `db.py` | MySQL connection pool + context managers |
-| `turnContext.py` | `EmotionGameTurn` dataclass |
-| `llm_client.py` | OpenAI client initialization |
-| `openAIqueries.py` | LLM: streaming, classification, cue generation |
-| `emotionGameQueries.py` | DB: emotion guessing (mark, get, assign) |
-| `phase_2_queries.py` | DB: storylets, tasks, inventory, relationships |
-| `elevenlabsQueries.py` | ElevenLabs TTS with caching |
-| `streamingMP3Player.py` | ffmpeg-based MP3 streaming player |
-| `streamNPCresponse/streamTextResponse.py` | Text streaming + TTS audio |
+| `camo_server.py` | Flask entry point, HTTP routes, werkzeug WS disconnect patch |
+| `sockets.py` | SocketIO event handlers, debug logging, connect/disconnect |
+| `UnrealPhase1.py` | Game state machine: `start_game`, `advance_game`, `assignEmotion` |
+| `turnContext.py` | `EmotionGameTurn` dataclass (all turn state + threading lock) |
+| `db.py` | MySQL connection pool (5), `get_cursor` and `transactional` context managers |
+| `llm_client.py` | OpenAI client init |
+| `openAIqueries.py` | LLM: streaming (`GPT-4o`), classification + cue gen (`GPT-4o-mini`) |
+| `emotionGameQueries.py` | DB: assign/mark emotions, get active, count correct |
+| `phase_2_queries.py` | DB: storylets, storylet choices, tasks, inventory, NPC relationships |
+| `elevenlabsQueries.py` | ElevenLabs TTS + caching, per-emotion voice settings, audio tag injection |
+| `streamNPCresponse/streamTextResponse.py` | Sentence-by-sentence text + TTS streaming to Unreal |
+| `streamingMP3Player.py` | ffmpeg-based local MP3 playback (`TTS_LOCAL_PLAYBACK=1`) |
 | `voiceRecorder.py` | Microphone recorder (SoundDevice) |
-| `emotion_game/` | Game modules: NPC intro, describe, guess, prompts |
-| `tests/` | Test suite (31 tests, pytest) |
-| `database/camodb_phase1.sql` | Full MySQL schema |
-| `emotionGame.py` | CLI/terminal game loop (legacy) |
+| `emotion_game/` | 10 modules: NPC intro, describe, guess, 6 prompt builders, NPC memory |
+| `tests/` | pytest suite (31 tests: turnContext, openAIqueries, db) |
+| `database/camodb_phase1.sql` | Full MySQL schema + seed data |
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_HOST` | `localhost` | MySQL host |
+| `DB_USER` | — | MySQL user |
+| `DB_PASSWORD` | — | MySQL password |
+| `DB_NAME` | — | MySQL database name |
+| `OPENAI_API_KEY` | — | OpenAI API key |
+| `ELEVENLABS_API_KEY` | — | ElevenLabs API key |
+| `NPC_VOICE_ID` | `XB0fDUnXU5powFXDhCwa` | ElevenLabs voice ID (Charlotte) |
+| `PLAYER_NAME` | `Gabriel` | Default player name |
+| `TTS_LOCAL_PLAYBACK` | `0` | `1` to play audio locally via ffmpeg |
+| `FFMPEG_BIN` | `ffmpeg` | Path to ffmpeg binary |
 
 ## Testing
 
 ```bash
 pytest tests/ -v
-# 31 tests: turnContext, openAIqueries, db
+# 31 tests across turnContext, openAIqueries, and db
 ```
 
-## Environment Variables
+## Design Decisions
 
-| Variable | Description |
-|----------|-------------|
-| `DB_HOST` | MySQL host (default: localhost) |
-| `DB_USER` | MySQL user |
-| `DB_PASSWORD` | MySQL password |
-| `DB_NAME` | MySQL database name |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `ELEVENLABS_API_KEY` | ElevenLabs API key |
-| `FFMPEG_BIN` | Path to ffmpeg (default: ffmpeg) |
+### Auto-start on connect
+
+`sockets.py` calls `start_game()` immediately on `connect` — the player doesn't
+need to send `register_user` first. This reduces latency for Unreal clients that
+connect at launch and expect the NPC to begin speaking.
+
+### Thread-safe turns
+
+`EmotionGameTurn._lock` is a `threading.Lock` acquired by both `start_game` and
+`advance_game`. If a second turn arrives while one is in progress (e.g. player
+clicks an emotion during NPC intro), it's silently dropped. Timeout on
+`advance_game` is 5 seconds — if the lock isn't released by then, the turn is
+skipped.
+
+### Streaming model
+
+Text and audio are streamed sentence-by-sentence (split on `.?!`). Each sentence
+triggers:
+1. `npc_audio_stop` — flush previous audio
+2. `npc_text_token` — clean text for Unreal closed captions
+3. Multiple `npc_audio_chunk` emits — base64 MP3 in 32KB chunks
+
+If the player sends input mid-stream, `cancel_stream` is set and the stream
+aborts immediately.
+
+### Werkzeug disconnect patch
+
+Flask's dev server corrupts WSGI state when a client disconnects during
+streaming. `camo_server.py` monkey-patches `WSGIRequestHandler.run_wsgi` with
+`passthrough_errors=True` to swallow the `AssertionError` instead of returning a
+500 that breaks the connection pool.
