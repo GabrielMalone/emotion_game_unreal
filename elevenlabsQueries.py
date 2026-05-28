@@ -28,24 +28,25 @@ _eleven = ElevenLabs(
     httpx_client=http_client,
 )
 
-# Per-emotion VoiceSettings — TUNED FOR eleven_v3
+# Per-emotion VoiceSettings — TUNED FOR eleven_v3 + Charlotte
 # v3 interprets [bracket tags] natively as performance cues.
-# stability: 0.30-0.50 — v3 handles low stability better than Turbo
-# style:     0.30-0.55 — v3 responds well to style/exaggeration
-# speed:     v3 range is wider (0.70-2.00); excited/angry can push past 1.2
+# Lower stability = more emotional range (ElevenLabs docs: 0.20-0.35 is the
+# "creative" sweet spot where audio tags have the most impact).
+# Charlotte (XB0fDUnXU5powFXDhCwa) handles low stability cleanly without
+# artifacts, so we can push emotional range further than Sarah/Amelia.
 EMOTION_VOICE_SETTINGS = {
-    "happy":     VoiceSettings(stability=0.34, similarity_boost=0.75, style=0.50, speed=1.10),  # use_speaker_boost removed — not available for eleven_v3
-    "excited":   VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.55, speed=1.30),  # use_speaker_boost removed — not available for eleven_v3
-    "surprised": VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.50, speed=1.20),  # use_speaker_boost removed — not available for eleven_v3
-    "sad":       VoiceSettings(stability=0.42, similarity_boost=0.75, style=0.40, speed=0.82),  # use_speaker_boost removed — not available for eleven_v3
-    "angry":     VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.55, speed=1.35),  # use_speaker_boost removed — not available for eleven_v3
-    "afraid":    VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.45, speed=1.10),  # use_speaker_boost removed — not available for eleven_v3
-    "disgusted": VoiceSettings(stability=0.36, similarity_boost=0.75, style=0.45, speed=0.92),  # use_speaker_boost removed — not available for eleven_v3
-    "calm":      VoiceSettings(stability=0.48, similarity_boost=0.75, style=0.35, speed=0.88),  # use_speaker_boost removed — not available for eleven_v3
-    "neutral":   VoiceSettings(stability=0.48, similarity_boost=0.75, style=0.30, speed=1.00),  # use_speaker_boost removed — not available for eleven_v3
-    "worried":   VoiceSettings(stability=0.38, similarity_boost=0.75, style=0.42, speed=0.95),  # use_speaker_boost removed — not available for eleven_v3
+    "happy":     VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.55, speed=1.10),
+    "excited":   VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.60, speed=1.30),
+    "surprised": VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.55, speed=1.20),
+    "sad":       VoiceSettings(stability=0.28, similarity_boost=0.75, style=0.45, speed=0.82),
+    "angry":     VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.60, speed=1.35),
+    "afraid":    VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.50, speed=1.10),
+    "disgusted": VoiceSettings(stability=0.24, similarity_boost=0.75, style=0.50, speed=0.92),
+    "calm":      VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.38, speed=0.88),
+    "neutral":   VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.32, speed=1.00),
+    "worried":   VoiceSettings(stability=0.25, similarity_boost=0.75, style=0.48, speed=0.95),
 }
-_DEFAULT_VOICE_SETTINGS = VoiceSettings(stability=0.40, similarity_boost=0.75, style=0.32, speed=1.0)  # use_speaker_boost removed — not available for eleven_v3
+_DEFAULT_VOICE_SETTINGS = VoiceSettings(stability=0.30, similarity_boost=0.75, style=0.35, speed=1.0)
 
 # ==================================================================
 # Audio tag vocabularies per emotion (2025/2026 ElevenLabs best practices)

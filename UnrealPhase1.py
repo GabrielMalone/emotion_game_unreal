@@ -33,7 +33,7 @@ currentScene = """
         "This feeling…", "What I’m feeling now…", or
         "The way my body feels right now…"
 """
-voiceId = os.environ.get("NPC_VOICE_ID", "EXAVITQu4vr4xnSDxMaL")  # Sarah by default
+voiceId = os.environ.get("NPC_VOICE_ID", "XB0fDUnXU5powFXDhCwa")  # Charlotte — natural, expressive, best v3 emotional range
 SERVER  = "http://localhost:5001"
 active_turns = {} # this will be persistent for the lifetime of the socketio instance
 turn = EmotionGameTurn(

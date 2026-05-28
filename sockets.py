@@ -100,6 +100,7 @@ def init_socket_events(app):
                 AND g.active = 1
             LIMIT 1;
         """)
-        emotion = cursor.fetchone()
+        row = cursor.fetchone()
+        emotion = row[0] if row else "neutral"
         _log(f"[get_cur_emotion] emotion={emotion}")
         sio.emit("send_cur_emotion", emotion)
