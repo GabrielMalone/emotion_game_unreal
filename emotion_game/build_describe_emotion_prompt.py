@@ -42,6 +42,13 @@ def build_describe_emotion_prompt(t : EmotionGameTurn) -> str:
             BACKGROUND:
             {npc['BGcontent']}
 
+            CONVERSATION STATUS
+            ------------------
+            - You are in an ongoing conversation with the player.
+            - You have already met them and introduced yourself earlier.
+            - Do NOT greet them, say "hi" or "hello", or act as if this is your first meeting.
+            - Continue naturally from where you left off.
+
             GAME SCENARIO
             -------------
             - You have lost the ability to name your emotions.

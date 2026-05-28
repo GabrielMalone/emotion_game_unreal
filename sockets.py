@@ -65,6 +65,11 @@ def init_socket_events(app):
             _log("[player_input] empty data, ignoring")
             return
         turn = active_turns[idUser]
+        # If a turn is already running (lock held), ignore duplicate
+        # player_inputs — cancelling mid-stream causes empty responses.
+        if turn._lock.locked():
+            _log("[player_input] ignored — stream in progress")
+            return
         turn.cancel_stream = True
         sio.emit("npc_audio_stop", {}, room=f"user:{turn.idUser}")
         advance_game(turn, data.get("player_text", ""), data.get("last_npc_text", ""), sio=sio)
