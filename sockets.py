@@ -74,6 +74,12 @@ def init_socket_events(app):
         sio.emit("npc_audio_stop", {}, room=f"user:{turn.idUser}")
         advance_game(turn, data.get("player_text", ""), data.get("last_npc_text", ""), sio=sio)
 
+    @sio.on("npc_audio_ready")
+    def on_npc_audio_ready():
+        _log("[npc_audio_ready] Unreal audio reset complete")
+        turn = active_turns[idUser]
+        turn.audio_ready = True
+
     @sio.on("player_stepped_away")
     def on_player_stepped_away(data=None):
         _log(f"[player_stepped_away] data={str(data)[:200]}")

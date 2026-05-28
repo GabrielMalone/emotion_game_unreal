@@ -7,8 +7,10 @@ from elevenlabsQueries import tts_cached
 CHUNK_SIZE = 32_768  # 32 KB
 
 def _strip_tags(text: str) -> str:
-    """Remove [emotion tags] like [happily], [sighs], [laughs] etc."""
-    return re.sub(r'\s*\[.*?\]\s*', ' ', text).strip()
+    """Remove [emotion tags] and normalize whitespace for clean text tokens."""
+    text = re.sub(r'\s*\[.*?\]\s*', ' ', text)   # strip bracket tags
+    text = re.sub(r'\s+', ' ', text)              # collapse newlines/tabs/multi-space → single space
+    return text.strip()
 
 
 def streamResponse(t: EmotionGameTurn, client, sio) -> str:
@@ -37,8 +39,21 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     # Tell Unreal to flush any queued audio from a previous stream
     # BEFORE we start emitting new chunks. This prevents old TTS from
     # playing over new dialogue when the player skips ahead.
+    t.audio_ready = False
     _emit("npc_audio_stop")
     sio.sleep(0)
+
+    # --- handshake: wait for Unreal to finish resetting its audio ---
+    handshake_timeout = 3.0  # seconds
+    handshake_step = 0.05
+    waited = 0.0
+    while not t.audio_ready and waited < handshake_timeout:
+        if t.cancel_stream:
+            t.streaming = False
+            return ""
+        sio.sleep(handshake_step)
+        waited += handshake_step
+    # ----------------------------------------------------------------
 
     # ----------------------------------------------------------
     # stream text + audio (closed-captioning style)
@@ -68,10 +83,12 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             _emit("keepalive")
             sio.sleep(0)
 
-            # Emit the clean text FIRST so it appears alongside the
-            # audio chunks that follow (closed-captioning sync)
+            # Emit the clean text FIRST so Unreal has it before audio.
+            # A real delay (not just sio.sleep(0)) ensures the event
+            # is fully delivered before audio chunks arrive — critical
+            # for lipsync (prevents Unreal state-accumulation desync).
             _emit("npc_text_token", {"token": clean_sentence})
-            sio.sleep(0)
+            sio.sleep(0.05)
 
             audio_buf = b""
             for audio_chunk in tts_cached(
@@ -97,6 +114,12 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
                     "audio_chunk": base64.b64encode(audio_buf).decode("utf-8"),
                 })
                 sio.sleep(0)
+
+            # Sentence audio fully sent — tell Unreal this sentence is done.
+            # Unreal should use THIS (not text completion) to know when the
+            # NPC has finished speaking a sentence.
+            _emit("npc_audio_done")
+            sio.sleep(0)
 
             sentence_buffer = ""
 
@@ -132,9 +155,18 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
                 "audio_chunk": base64.b64encode(audio_buf).decode("utf-8"),
             })
             sio.sleep(0)
+
+        _emit("npc_audio_done")
+        sio.sleep(0)
     # ----------------------------------------------------------
 
     t.streaming = False
+
+    # All audio fully sent — Unreal should use this as the
+    # definitive "NPC is done speaking" signal.
+    _emit("npc_stream_audio_done")
+    sio.sleep(0)
+
     return "".join(full_text)
 
 

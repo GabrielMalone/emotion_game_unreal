@@ -23,4 +23,5 @@ class EmotionGameTurn:
     cues:               List[str] = field(default_factory=list)
     cancel_stream:      bool = False
     streaming:          bool = False
+    audio_ready:        bool = True   # Unreal sets via npc_audio_ready handshake
     _lock:              threading.Lock = field(default_factory=threading.Lock)

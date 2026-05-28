@@ -168,12 +168,17 @@ MySQL and the game resumes transparently.
 
 | Event | Payload | Description |
 |-------|---------|-------------|
+| `register_user` | `{idUser}` | User registered, emitted on connect |
+| `game_start` | `{}` | Game started (player agreed or game resumed) |
 | `npc_text_token` | `{token}` | Sentence of NPC dialogue (cleaned, no tags) |
 | `npc_audio_chunk` | `{audio_chunk}` | Base64-encoded MP3 chunk (32KB) |
-| `npc_audio_stop` | `{}` | Flush queued audio, stop playback |
-| `npc_responded` | `{}` | NPC response complete |
+| `npc_audio_stop` | `{}` | Flush queued audio, stop playback — destroy/recreate StreamingSoundWave |
+| `npc_audio_done` | `{}` | Per-sentence audio finished playing |
+| `npc_stream_audio_done` | `{}` | All audio finished — use as "done speaking" signal |
+| `npc_responded` | `{text}` | NPC response complete (non-streaming fallback) |
+| `current_emotion` | string | Current NPC emotion name (per-user, during describe) |
 | `send_cur_emotion` | string | Current NPC emotion name (broadcast) |
-| `correct` | `{num_correct}` | Running count of correct guesses |
+| `correct` | number | Running count of correct guesses |
 | `stream_cancelled` | `{}` | Stream aborted (player walked away) |
 | `keepalive` | `{}` | Connection keepalive |
 | `pong` | `"HELLO_FROM_FLASK"` | Ping response |
