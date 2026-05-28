@@ -1,4 +1,4 @@
-import os, uuid, random
+import os, uuid, random, base64
 import httpx
 from elevenlabs.client import ElevenLabs
 from elevenlabs.types import VoiceSettings
@@ -130,8 +130,16 @@ def tts_cached(text, voice_id, emotion):
                     break
                 yield chunk
         return
+    # Generate and cache
+    chunks = []
     for chunk in tts(text, voice_id, emotion):
+        chunks.append(chunk)
         yield chunk
+    # Write to cache so next time hits
+    with open(path, "wb") as f:
+        for chunk in chunks:
+            f.write(chunk)
+    print(f"CACHED: {path}")
 
 def speech_to_text(wav_path: str) -> str:
     pass
@@ -152,6 +160,157 @@ def tts(text, voice_id, emotion):
     for chunk in audio_stream:
         if chunk:
             yield chunk
+
+
+# ------------------------------------------------------------------
+# TTS with word-level timestamps (character alignment from ElevenLabs)
+# ------------------------------------------------------------------
+def tts_with_timestamps(text, voice_id, emotion):
+    """Like tts() but yields (audio_bytes, alignment_chars, alignment_starts, alignment_ends).
+
+    alignment_* lists are populated incrementally — only the last chunk with
+    alignment data will have non-empty lists.  Callers must accumulate.
+    """
+    voice_settings = EMOTION_VOICE_SETTINGS.get(emotion, _DEFAULT_VOICE_SETTINGS)
+    tagged_text = _apply_audio_tags(text, emotion)
+    print(f"TTS+timestamps: voiceID={voice_id} emotion={emotion}")
+
+    stream = _eleven.text_to_speech.stream_with_timestamps(
+        voice_id=voice_id,
+        text=tagged_text,
+        model_id="eleven_v3",
+        voice_settings=voice_settings,
+    )
+
+    accumulated_chars = []
+    accumulated_starts = []
+    accumulated_ends = []
+
+    for chunk in stream:
+        audio_b64 = chunk.audio_base_64
+        audio_bytes = base64.b64decode(audio_b64) if audio_b64 else b""
+
+        # Alignment data arrives piecemeal — accumulate
+        align = chunk.alignment
+        if align and align.characters:
+            accumulated_chars.extend(align.characters)
+            accumulated_starts.extend(align.character_start_times_seconds)
+            accumulated_ends.extend(align.character_end_times_seconds)
+
+        yield (audio_bytes, accumulated_chars.copy(), accumulated_starts.copy(), accumulated_ends.copy())
+
+
+def tts_with_timestamps_cached(text, voice_id, emotion):
+    """Same as tts_with_timestamps but caches audio + alignment to disk."""
+    import json
+    key = tts_cache_key(text, voice_id, emotion)
+    audio_path = f"{AUDIO_DIR}/{key}.mp3"
+    align_path = f"{AUDIO_DIR}/{key}_align.json"
+
+    # --- cache hit: stream from disk ---
+    if os.path.exists(audio_path) and os.path.exists(align_path):
+        print("USING CACHE (with timestamps)!")
+        with open(align_path, "r") as f:
+            saved = json.load(f)
+        cached_chars = saved["chars"]
+        cached_starts = saved["starts"]
+        cached_ends = saved["ends"]
+        with open(audio_path, "rb") as f:
+            while True:
+                chunk = f.read(32_768)
+                if not chunk:
+                    break
+                yield (chunk, cached_chars, cached_starts, cached_ends)
+        return
+
+    # --- cache miss: generate, cache, yield ---
+    all_audio = []
+    all_chars = []
+    all_starts = []
+    all_ends = []
+    for audio_bytes, chars, starts, ends in tts_with_timestamps(text, voice_id, emotion):
+        all_audio.append(audio_bytes)
+        all_chars = chars
+        all_starts = starts
+        all_ends = ends
+        yield (audio_bytes, chars, starts, ends)
+
+    # Save audio
+    with open(audio_path, "wb") as f:
+        for chunk in all_audio:
+            f.write(chunk)
+    # Save alignment data
+    with open(align_path, "w") as f:
+        json.dump({"chars": all_chars, "starts": all_starts, "ends": all_ends}, f)
+    print(f"CACHED (with timings): {audio_path}")
+
+
+def _char_alignments_to_words(chars, starts, ends):
+    """Convert character-level alignment to word-level timings.
+
+    Returns list of {word, start, end} dicts, dropping bracket tags.
+    """
+    if not chars:
+        return []
+
+    words = []
+    current_word_chars = []
+    current_word_start = None
+    in_bracket = False
+
+    for i, ch in enumerate(chars):
+        if ch == "[":
+            in_bracket = True
+            # Flush any partial word before the tag
+            if current_word_chars:
+                word_text = "".join(current_word_chars).strip()
+                if word_text:
+                    words.append({
+                        "word": word_text,
+                        "start": current_word_start,
+                        "end": ends[i - 1] if i > 0 and i - 1 < len(ends) else (ends[-1] if ends else 0.0),
+                        "used": False,
+                    })
+                current_word_chars = []
+                current_word_start = None
+            continue
+
+        if ch == "]":
+            in_bracket = False
+            continue
+
+        if in_bracket:
+            continue
+
+        if ch in " \t\n\r":
+            if current_word_chars:
+                word_text = "".join(current_word_chars).strip()
+                if word_text:
+                    words.append({
+                        "word": word_text,
+                        "start": current_word_start,
+                        "end": ends[i - 1] if i > 0 and i - 1 < len(ends) else ends[-1],
+                    })
+                current_word_chars = []
+                current_word_start = None
+        else:
+            if current_word_start is None and i < len(starts):
+                current_word_start = starts[i]
+            current_word_chars.append(ch)
+
+    # Flush last word
+    if current_word_chars:
+        word_text = "".join(current_word_chars).strip()
+        if word_text:
+            words.append({
+                "word": word_text,
+                "start": current_word_start,
+                "end": ends[-1] if ends else 0.0,
+                "used": False,
+            })
+
+    return words
+
 
 def _apply_audio_tags(text: str, emotion: str) -> str:
     """Apply ElevenLabs v3 audio tags using 2025/2026 best practices.

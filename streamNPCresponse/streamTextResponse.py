@@ -2,7 +2,7 @@ import openAIqueries
 import base64
 import re
 from turnContext import EmotionGameTurn
-from elevenlabsQueries import tts_cached
+from elevenlabsQueries import tts_with_timestamps_cached, _char_alignments_to_words
 
 CHUNK_SIZE = 32_768  # 32 KB
 
@@ -75,23 +75,22 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             and sentence_buffer.strip()
             and sentence_buffer.strip()[-1] in SENTENCE_END
         ):
-            # Strip emotion tags so Unreal gets clean text for CC display
-            # AND so ElevenLabs doesn't read stage directions aloud
             clean_sentence = _strip_tags(sentence_buffer)
 
-            # Send keepalive before audio processing
             _emit("keepalive")
             sio.sleep(0)
 
-            # Emit the clean text FIRST so Unreal has it before audio.
-            # A real delay (not just sio.sleep(0)) ensures the event
-            # is fully delivered before audio chunks arrive — critical
-            # for lipsync (prevents Unreal state-accumulation desync).
             _emit("npc_text_token", {"token": clean_sentence})
             sio.sleep(0.05)
 
-            audio_buf = b""
-            for audio_chunk in tts_cached(
+            # Stream audio AND word timings together.
+            # Alignment data accumulates per chunk — we emit updated
+            # word timings BEFORE each audio chunk so Unreal always
+            # has the latest timings before the audio plays.
+            all_chars = []
+            all_starts = []
+            all_ends = []
+            for audio_chunk, chars, starts, ends in tts_with_timestamps_cached(
                 clean_sentence, t.voiceId, t.cur_npc_emotion
             ):
                 if t.cancel_stream:
@@ -100,24 +99,22 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
                     t.streaming = False
                     return "".join(full_text)
 
-                audio_buf += audio_chunk
-                while len(audio_buf) >= CHUNK_SIZE:
-                    print("SENDING AUDIO EMIT (sentence)")
-                    _emit("npc_audio_chunk", {
-                        "audio_chunk": base64.b64encode(audio_buf[:CHUNK_SIZE]).decode("utf-8"),
-                    })
-                    audio_buf = audio_buf[CHUNK_SIZE:]
+                all_chars = chars
+                all_starts = starts
+                all_ends = ends
+
+                # Emit latest word timings BEFORE this audio chunk
+                word_timings = _char_alignments_to_words(all_chars, all_starts, all_ends)
+                if word_timings:
+                    _emit("npc_word_timings", {"words": word_timings})
                     sio.sleep(0)
-            if audio_buf:
-                print("SENDING AUDIO EMIT (sentence tail)")
+
+                # Now emit the audio chunk
                 _emit("npc_audio_chunk", {
-                    "audio_chunk": base64.b64encode(audio_buf).decode("utf-8"),
+                    "audio_chunk": base64.b64encode(audio_chunk).decode("utf-8"),
                 })
                 sio.sleep(0)
 
-            # Sentence audio fully sent — tell Unreal this sentence is done.
-            # Unreal should use THIS (not text completion) to know when the
-            # NPC has finished speaking a sentence.
             _emit("npc_audio_done")
             sio.sleep(0)
 
@@ -131,8 +128,10 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
         _emit("npc_text_token", {"token": clean_sentence})
         sio.sleep(0)
 
-        audio_buf = b""
-        for audio_chunk in tts_cached(
+        all_chars = []
+        all_starts = []
+        all_ends = []
+        for audio_chunk, chars, starts, ends in tts_with_timestamps_cached(
             clean_sentence, t.voiceId, t.cur_npc_emotion
         ):
             if t.cancel_stream:
@@ -141,18 +140,17 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
                 t.streaming = False
                 return "".join(full_text)
 
-            audio_buf += audio_chunk
-            while len(audio_buf) >= CHUNK_SIZE:
-                print("SENDING AUDIO EMIT (flush)")
-                _emit("npc_audio_chunk", {
-                    "audio_chunk": base64.b64encode(audio_buf[:CHUNK_SIZE]).decode("utf-8"),
-                })
-                audio_buf = audio_buf[CHUNK_SIZE:]
+            all_chars = chars
+            all_starts = starts
+            all_ends = ends
+
+            word_timings = _char_alignments_to_words(all_chars, all_starts, all_ends)
+            if word_timings:
+                _emit("npc_word_timings", {"words": word_timings})
                 sio.sleep(0)
-        if audio_buf:
-            print("SENDING AUDIO EMIT (flush tail)")
+
             _emit("npc_audio_chunk", {
-                "audio_chunk": base64.b64encode(audio_buf).decode("utf-8"),
+                "audio_chunk": base64.b64encode(audio_chunk).decode("utf-8"),
             })
             sio.sleep(0)
 
@@ -162,13 +160,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
 
     t.streaming = False
 
-    # All audio fully sent — Unreal should use this as the
-    # definitive "NPC is done speaking" signal.
     _emit("npc_stream_audio_done")
     sio.sleep(0)
 
     return "".join(full_text)
-
-
-
-

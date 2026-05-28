@@ -75,7 +75,7 @@ def init_socket_events(app):
         advance_game(turn, data.get("player_text", ""), data.get("last_npc_text", ""), sio=sio)
 
     @sio.on("npc_audio_ready")
-    def on_npc_audio_ready():
+    def on_npc_audio_ready(sid=None):
         _log("[npc_audio_ready] Unreal audio reset complete")
         turn = active_turns[idUser]
         turn.audio_ready = True
