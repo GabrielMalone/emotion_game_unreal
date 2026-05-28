@@ -205,42 +205,6 @@ def get_cues_for_emotion(emotion: str, client) -> list[str]:
     ]
 
 # ------------------------------------------------------------
-def match_choice_query(client):
-    """
-    Match a player's storylet choice to determine outcomes.
-    Currently a stub -- implement based on game design requirements.
-
-    Expected request JSON:
-        {"idChoice": int, "idUser": int, "idNPC": int, "idStorylet": int}
-    """
-    from flask import request, jsonify
-    data = request.json
-    if not data:
-        return jsonify({"status": "error", "reason": "Missing request body"}), 400
-
-    id_choice = data.get("idChoice")
-    if id_choice is None:
-        return jsonify({"status": "error", "reason": "Missing idChoice"}), 400
-
-    # Delegate to phase_2 choice handlers based on idChoice
-    if id_choice == 1:
-        from phase_2_queries import idChoice_1_query
-        return idChoice_1_query(
-            idUser=data.get("idUser"),
-            idNPC=data.get("idNPC"),
-            idStorylet=data.get("idStorylet"),
-        )
-    elif id_choice == 3:
-        from phase_2_queries import idChoice_3_query
-        return idChoice_3_query(
-            idUser=data.get("idUser"),
-            idNPC=data.get("idNPC"),
-            idStorylet=data.get("idStorylet"),
-        )
-    else:
-        return jsonify({"status": "error", "reason": f"Unknown idChoice: {id_choice}"}), 400
-
-# ------------------------------------------------------------
 def parse_llm_json(text: str) -> dict:
     """
     Robustly parse JSON returned by an LLM.
