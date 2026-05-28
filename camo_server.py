@@ -28,10 +28,7 @@ werkzeug.serving.WSGIRequestHandler.run_wsgi = _patched_run_wsgi
 # ------------------------------------------------------------------
 
 from sockets import sio, init_socket_events
-from llm_client import client
-import openAIqueries
-from emotionGameQueries import *
-from phase_2_queries import *
+from phase_2_queries import update_NPC_user_memory_query, get_NPC_user_memory_query
 
 # --------------------------------------------------
 load_dotenv()
@@ -48,10 +45,6 @@ init_socket_events(camo)
 @camo.route("/tts_audio/<audio_id>", methods=["GET"])
 def tts_audio(audio_id):
     return send_file(f"{AUDIO_DIR}/{audio_id}.mp3", mimetype="audio/mp3")
-
-@camo.route("/match_choice", methods=["POST"])
-def match_choice():
-    return openAIqueries.match_choice_query(client)
 
 @camo.route("/update_NPC_user_mem", methods=["POST"])
 def update_NPC_user_memory():
