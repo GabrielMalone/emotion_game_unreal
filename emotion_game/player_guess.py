@@ -23,7 +23,7 @@ def player_guess(turn: EmotionGameTurn, socketio) -> str:
     if turn.game_over:
         print("\nALL EMOTIONS ASNWERED!\n")
         turn.npc_memory = f"{turn.player_name} correctly identified all of your emotions and completed the round {turn.emotion_guessed}"
-        update_NPC_user_memory_query(turn)
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
         turn.npc_memory = getNPCmem(turn)
         turn.prompt = build_end_round_prompt(turn)
         turn.last_npc_text = streamResponse(turn, client, sio=socketio)
@@ -45,7 +45,7 @@ def player_guess(turn: EmotionGameTurn, socketio) -> str:
         print(f"\nOTHER THAN GUESS BRANCH on statement {turn.player_text}\n")
         turn.npc_memory = f"{turn.player_name} just made a statement that was not a guess: {turn.player_text}"
         if (turn.player_text):
-            update_NPC_user_memory_query(turn)
+            update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
         turn.npc_memory = getNPCmem(turn)
         turn.cues = openAIqueries.get_cues_for_emotion(npc_emotion, client=client)
         turn.prompt = build_no_guess_prompt(turn)
@@ -68,14 +68,14 @@ def player_guess(turn: EmotionGameTurn, socketio) -> str:
             pass
         # update npc memory about this event
         turn.npc_memory = f"{turn.player_name} said: {turn.player_text}. As a result {turn.player_name} correctly identified your emotion {turn.emotion_guessed}"
-        update_NPC_user_memory_query(turn)
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
         turn.npc_memory = getNPCmem(turn)
         return {"status" : "True", "turnData" : turn}
 
     else: 
         print(f"INCORRECT! {turn.emotion_guessed} != {npc_emotion}  ")
         turn.npc_memory = f"{turn.player_name} said: {turn.player_text}. As a result {turn.player_name} incorrectly identified your emotion {turn.emotion_guessed}"
-        update_NPC_user_memory_query(turn)
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
         turn.cues = openAIqueries.get_cues_for_emotion(npc_emotion, client=client)
         turn.prompt = build_incorrect_prompt(turn)
         turn.last_npc_text = streamResponse(turn, client=client, sio=socketio)

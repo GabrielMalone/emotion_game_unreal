@@ -25,7 +25,7 @@ def npc_describe_emotion(turn: EmotionGameTurn, sio) -> str:
         print("\nNPC DESCRIBE EMOTION RESPONSE: ", turn.last_npc_text)
         # update npcs kb with its own response
         turn.npc_memory = f"[You just responded to {turn.player_name} with:] '{turn.last_npc_text}'"
-        update_NPC_user_memory_query(turn)
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
 
         try:
             sio.emit("npc_responded", {"text": turn.last_npc_text}, room=f"user:{turn.idUser}")

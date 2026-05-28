@@ -24,7 +24,7 @@ def npc_introduce(turn: EmotionGameTurn, sio):
     print("\nNPC INTRO RESPONSE: ", r)
     # update npcs kb with its own response
     turn.npc_memory = f"[You just greeted {turn.player_name} with:] '{r}'"
-    update_NPC_user_memory_query(turn)
+    update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
     try:
         sio.emit("npc_responded", {"text": r}, room=f"user:{turn.idUser}")
     except Exception:
@@ -40,7 +40,7 @@ def player_disagreed(turn: EmotionGameTurn, sio):
     # update NPC's mem of player's response
     turn.npc_memory = f"[Player just disagreed to play with you by saying] '{turn.player_text}'"
     mem = getNPCmem(turn)
-    update_NPC_user_memory_query(turn)
+    update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
     turn.npc_memory = mem
     turn.prompt = build_disagree_prompt(turn)
     turn.last_npc_text = streamResponse(turn, client=client, sio=sio)

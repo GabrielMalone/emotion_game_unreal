@@ -31,14 +31,11 @@ def init_socket_events(app):
     @sio.on("connect")
     def on_connect():
         _log("[connect] player connected")
-        # Auto-start the game — don't wait for register_user
+        # Join the room but DON'T start the game yet —
+        # wait for register_user from Unreal so the client
+        # is fully initialized and ready to receive audio.
         join_room(f"user:{idUser}")
-        _log(f"[connect] joined room user:{idUser}, calling start_game...")
-        try:
-            start_game(sio=sio)
-            _log("[connect] start_game() completed")
-        except Exception as e:
-            _log(f"[connect] start_game() ERROR: {e}")
+        _log(f"[connect] joined room user:{idUser}, waiting for register_user...")
 
     @sio.on("ping")
     def ping(data=None):
