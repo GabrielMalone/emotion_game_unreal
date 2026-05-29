@@ -1,6 +1,7 @@
 import openAIqueries
 import base64
 import re
+import time
 from turnContext import EmotionGameTurn
 from elevenlabsQueries import tts_with_timestamps_cached, _char_alignments_to_words
 
@@ -83,10 +84,9 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             _emit("npc_text_token", {"token": clean_sentence})
             sio.sleep(0.05)
 
-            # Stream audio AND word timings together.
-            # Alignment data accumulates per chunk — we emit updated
-            # word timings BEFORE each audio chunk so Unreal always
-            # has the latest timings before the audio plays.
+            # Stream audio.  Capture ref timestamp before the first
+            # chunk so word timing stays anchored to audio playback start.
+            ref = time.time()
             all_chars = []
             all_starts = []
             all_ends = []
@@ -103,13 +103,6 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
                 all_starts = starts
                 all_ends = ends
 
-                # Emit latest word timings BEFORE this audio chunk
-                word_timings = _char_alignments_to_words(all_chars, all_starts, all_ends)
-                if word_timings:
-                    _emit("npc_word_timings", {"words": word_timings})
-                    sio.sleep(0)
-
-                # Now emit the audio chunk
                 _emit("npc_audio_chunk", {
                     "audio_chunk": base64.b64encode(audio_chunk).decode("utf-8"),
                 })
@@ -117,6 +110,22 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
 
             _emit("npc_audio_done")
             sio.sleep(0)
+
+            # Fire word display in a detached background task so
+            # streamResponse can return immediately.  This prevents a
+            # second streamResponse call from killing the audio mid‐playback.
+            word_timings = _char_alignments_to_words(all_chars, all_starts, all_ends)
+
+            def _emit_words():
+                for w in word_timings:
+                    delay = (ref + w["start"]) - time.time()
+                    if delay > 0:
+                        sio.sleep(delay)
+                    if t.cancel_stream:
+                        break
+                    _emit("show_word", {"word": w["word"]})
+
+            sio.start_background_task(_emit_words)
 
             sentence_buffer = ""
 
@@ -128,6 +137,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
         _emit("npc_text_token", {"token": clean_sentence})
         sio.sleep(0)
 
+        ref = time.time()
         all_chars = []
         all_starts = []
         all_ends = []
@@ -144,11 +154,6 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             all_starts = starts
             all_ends = ends
 
-            word_timings = _char_alignments_to_words(all_chars, all_starts, all_ends)
-            if word_timings:
-                _emit("npc_word_timings", {"words": word_timings})
-                sio.sleep(0)
-
             _emit("npc_audio_chunk", {
                 "audio_chunk": base64.b64encode(audio_chunk).decode("utf-8"),
             })
@@ -156,6 +161,20 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
 
         _emit("npc_audio_done")
         sio.sleep(0)
+
+        # Fire word display in a detached background task.
+        word_timings = _char_alignments_to_words(all_chars, all_starts, all_ends)
+
+        def _emit_words():
+            for w in word_timings:
+                delay = (ref + w["start"]) - time.time()
+                if delay > 0:
+                    sio.sleep(delay)
+                if t.cancel_stream:
+                    break
+                _emit("show_word", {"word": w["word"]})
+
+        sio.start_background_task(_emit_words)
     # ----------------------------------------------------------
 
     t.streaming = False
