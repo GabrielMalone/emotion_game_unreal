@@ -24,14 +24,24 @@ for /f "usebackq tokens=1,2 delims==" %%a in (".env") do (
     if "%%a"=="DB_USER"    set "DB_USER=%%b"
     if "%%a"=="DB_NAME"    set "DB_NAME=%%b"
     if "%%a"=="DB_HOST"    set "DB_HOST=%%b"
+    if "%%a"=="DB_PORT"    set "DB_PORT=%%b"
+    if "%%a"=="DB_SSL_CA"  set "DB_SSL_CA=%%b"
 )
 
 if "%DB_PASS%"=="" echo   WARNING: DB_PASSWORD not found in .env, using empty
 if "%DB_USER%"=="" set "DB_USER=root"
 if "%DB_NAME%"=="" set "DB_NAME=camodb"
 if "%DB_HOST%"=="" set "DB_HOST=localhost"
+if "%DB_PORT%"=="" set "DB_PORT=3306"
+if "%DB_SSL_CA%"=="" set "DB_SSL_CA=isrg-root-x1.pem"
 
-echo   DB: %DB_USER%@%DB_HOST%/%DB_NAME%
+echo   DB: %DB_USER%@%DB_HOST%:%DB_PORT%/%DB_NAME%
+if exist "%DB_SSL_CA%" (
+    echo   SSL CA: %DB_SSL_CA%
+) else (
+    echo   WARNING: SSL CA file not found: %DB_SSL_CA% - proceeding without SSL
+    set "DB_SSL_CA="
+)
 
 :: ------------------------------------------------------------------
 :: 2. Reset database to initial state
@@ -55,17 +65,25 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:: Build SSL args for mysql CLI
+set "MYSQL_SSL_ARGS="
+if not "%DB_SSL_CA%"=="" (
+    if exist "%DB_SSL_CA%" (
+        set "MYSQL_SSL_ARGS=--ssl-ca=%DB_SSL_CA% --ssl-mode=VERIFY_IDENTITY"
+    )
+)
+
 :: Run import — capture stderr in case of failure
 echo   Importing %SQL_FILE% ...
 set "MYSQL_ERR=%TEMP%\mysql_import_err.txt"
-mysql -u %DB_USER% -p%DB_PASS% -h %DB_HOST% --default-character-set=utf8mb4 < "%SQL_FILE%" 2>"%MYSQL_ERR%"
+mysql -u %DB_USER% -p%DB_PASS% -h %DB_HOST% -P %DB_PORT% %MYSQL_SSL_ARGS% --default-character-set=utf8mb4 < "%SQL_FILE%" 2>"%MYSQL_ERR%"
 if errorlevel 1 (
     echo   ERROR: mysql import failed. Error output:
     type "%MYSQL_ERR%" 2>nul
     del "%MYSQL_ERR%" 2>nul
     echo.
     echo   Retry manually:
-    echo     mysql -u %DB_USER% -p -h %DB_HOST% ^< %SQL_FILE%
+    echo     mysql -u %DB_USER% -p -h %DB_HOST% -P %DB_PORT% %MYSQL_SSL_ARGS% ^< %SQL_FILE%
     pause
     exit /b 1
 )
