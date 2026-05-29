@@ -26,11 +26,6 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     t.streaming = True
     t.word_gen = getattr(t, "word_gen", 0) + 1   # generation counter for word tasks
 
-    # Accumulate all word timings across sentences.  Each entry:
-    #   {"word": str, "absolute_start": float}
-    # We spawn ONE background task at the end to emit them in order.
-    all_word_timings = []
-
     # ------------------------------------------------------------------
     # Safe emit helper
     # ------------------------------------------------------------------
@@ -63,8 +58,8 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
         waited += handshake_step
 
     # When the last queued audio chunk will finish playing in Unreal.
-    # We use max(ref, cumulative_end) so gaps between sentences
-    # (OpenAI generation time) don't accumulate bogus offset.
+    # Each sentence's word task uses max(ref, cumulative_end) so its
+    # first word doesn't fire until previous audio finishes.
     cumulative_end = 0.0
     # ----------------------------------------------------------------
 
@@ -110,11 +105,23 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
         audio_duration = all_ends[-1] if all_ends else 0.0
         cumulative_end = sentence_start + audio_duration
 
-        for w in _char_alignments_to_words(all_chars, all_starts, all_ends):
-            all_word_timings.append({
-                "word": w["word"],
-                "absolute_start": sentence_start + w["start"],
-            })
+        word_timings = _char_alignments_to_words(all_chars, all_starts, all_ends)
+
+        # Spawn a background task NOW so words start firing immediately
+        # (or after previous audio, thanks to sentence_start offset).
+        def _emit_words():
+            gen = t.word_gen
+            for w in word_timings:
+                if t.word_gen != gen or t.cancel_stream:
+                    break
+                delay = (sentence_start + w["start"]) - time.time()
+                if delay > 0:
+                    sio.sleep(delay)
+                if t.word_gen != gen or t.cancel_stream:
+                    break
+                _emit("show_word", {"word": w["word"]})
+
+        sio.start_background_task(_emit_words)
 
         return True
 
@@ -150,24 +157,6 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
         clean_sentence = _strip_tags(sentence_buffer)
         _process_sentence(clean_sentence)
     # ----------------------------------------------------------
-
-    # Spawn ONE background task to emit all words in order.
-    # This prevents a second streamResponse call from killing the
-    # audio mid-playback, and guarantees no interleaving.
-    if all_word_timings:
-        def _emit_all_words():
-            gen = t.word_gen
-            for entry in all_word_timings:
-                if t.word_gen != gen or t.cancel_stream:
-                    break
-                delay = entry["absolute_start"] - time.time()
-                if delay > 0:
-                    sio.sleep(delay)
-                if t.word_gen != gen or t.cancel_stream:
-                    break
-                _emit("show_word", {"word": entry["word"]})
-
-        sio.start_background_task(_emit_all_words)
 
     t.streaming = False
 
