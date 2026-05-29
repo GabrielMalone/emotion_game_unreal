@@ -107,18 +107,52 @@ TTS_LOCAL_PLAYBACK=0                   # 1 = play audio locally via ffmpeg
 
 ### 4. Database
 
-The database is hosted on TiDB Cloud (MySQL-compatible, free Starter tier).
-No local MySQL installation is required.
+The database is hosted on **TiDB Cloud** (MySQL-compatible, free Starter tier).
+No local MySQL installation is required — just a `mysql` CLI client.
+
+#### 4a. Interactive connection
 
 ```bash
-# On Windows — start_game.bat handles DB reset automatically
-start_game.bat
-
-# On macOS/Linux — import manually
 mysql -u YOUR_USER -p -h YOUR_HOST -P 4000 \
   --ssl-ca=isrg-root-x1.pem --ssl-mode=VERIFY_IDENTITY \
-  < database/camodb_phase1.sql
+  camodb
 ```
+
+Once connected, you can run any ad-hoc SQL:
+
+```sql
+SHOW TABLES;
+DESCRIBE emotion;
+SELECT * FROM emotion LIMIT 5;
+```
+
+To create new tables, add columns, or insert data — just run `CREATE TABLE`,
+`ALTER TABLE`, `INSERT`, etc. directly in this session. TiDB Cloud Starter is
+fully MySQL-compatible.
+
+#### 4b. Apply a SQL file
+
+```bash
+# Any .sql file works — new tables, seed data, migrations, etc.
+mysql -u YOUR_USER -p -h YOUR_HOST -P 4000 \
+  --ssl-ca=isrg-root-x1.pem --ssl-mode=VERIFY_IDENTITY \
+  camodb < your_migration.sql
+```
+
+#### 4c. Schema reference
+
+The baseline schema is in [`database/camodb_phase1.sql`](database/camodb_phase1.sql).
+This file is also used by `start_game.bat` for the initial setup on Windows.
+
+#### 4d. Reset (Windows)
+
+```bash
+# Drop + recreate + re-seed the database
+start_game.bat
+```
+
+Uses the same SSL flags — reads `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`,
+`DB_PORT`, and `DB_SSL_CA` from your `.env` file.
 
 ### 5. Run
 
