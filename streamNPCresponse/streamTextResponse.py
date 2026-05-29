@@ -39,23 +39,9 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             t.cancel_stream = True
             return False
 
-    # Tell Unreal to flush any queued audio from a previous stream
-    # BEFORE we start emitting new chunks. This prevents old TTS from
-    # playing over new dialogue when the player skips ahead.
-    t.audio_ready = False
-    _emit("npc_audio_stop")
-    sio.sleep(0)
-
-    # --- handshake: wait for Unreal to finish resetting its audio ---
-    handshake_timeout = 3.0  # seconds
-    handshake_step = 0.05
-    waited = 0.0
-    while not t.audio_ready and waited < handshake_timeout:
-        if t.cancel_stream:
-            t.streaming = False
-            return ""
-        sio.sleep(handshake_step)
-        waited += handshake_step
+    # Don't emit npc_audio_stop here — it kills lipsync in Unreal.
+    # Old-audio cleanup is handled by t.word_gen (cancels old word
+    # tasks) and Unreal's own audio queuing.
 
     # When the last queued audio chunk will finish playing in Unreal.
     # Each sentence's word task uses max(ref, cumulative_end) so its
@@ -80,7 +66,6 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             clean_sentence, t.voiceId, t.cur_npc_emotion
         ):
             if t.cancel_stream:
-                _emit("npc_audio_stop")
                 _emit("stream_cancelled")
                 t.streaming = False
                 return False
@@ -131,7 +116,6 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     for token in openAIqueries.getResponseStream(t, client):
         # --- player walked away or socket died? abort immediately ---
         if t.cancel_stream:
-            _emit("npc_audio_stop")
             _emit("stream_cancelled")
             t.streaming = False
             return "".join(full_text)
