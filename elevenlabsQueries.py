@@ -23,10 +23,10 @@ _eleven = ElevenLabs(
 # artifacts, so we can push emotional range further than Sarah/Amelia.
 EMOTION_VOICE_SETTINGS = {
     "happy":     VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.55, speed=1.10),
-    "excited":   VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.60, speed=1.30),
+    "excited":   VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.60, speed=1.20),
     "surprised": VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.55, speed=1.20),
     "sad":       VoiceSettings(stability=0.28, similarity_boost=0.75, style=0.45, speed=0.82),
-    "angry":     VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.60, speed=1.35),
+    "angry":     VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.60, speed=1.20),
     "afraid":    VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.50, speed=1.10),
     "disgusted": VoiceSettings(stability=0.24, similarity_boost=0.75, style=0.50, speed=0.92),
     "calm":      VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.38, speed=0.88),

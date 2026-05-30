@@ -97,6 +97,9 @@ ELEVENLABS_API_KEY=sk_...
 NPC_VOICE_ID=XB0fDUnXU5powFXDhCwa    # Charlotte — ElevenLabs voice ID
 PLAYER_NAME=Gabriel                    # Default player name
 TTS_LOCAL_PLAYBACK=0                   # 1 = play audio locally via ffmpeg
+DEBUG_SHORT_RESPONSES=                 # Set to any text to replace ALL NPC output
+                                       #   e.g. "Hello." → NPC always says "Hello."
+                                       #   Leave empty for normal AI responses
 ```
 
 > **SSL certificate**: TiDB Cloud Starter uses Let's Encrypt (ISRG Root X1).
@@ -226,10 +229,9 @@ TiDB Cloud and the game resumes transparently.
 | `game_start` | `{}` | Game started (player agreed or game resumed) |
 | `npc_text_token` | `{token}` | Sentence of NPC dialogue (cleaned, no tags) |
 | `npc_audio_chunk` | `{audio_chunk}` | Base64-encoded MP3 chunk (32KB) |
-| `npc_audio_stop` | `{}` | Flush queued audio, stop playback — destroy/recreate StreamingSoundWave |
 | `npc_audio_done` | `{}` | Per-sentence audio finished playing |
 | `npc_stream_audio_done` | `{}` | All audio finished — use as "done speaking" signal |
-| `npc_word_timings` | `{words: [{word, start, end}]}` | Word-level timestamps — drive text display from audio playback |
+| `show_word` | `{word}` | Single word timed to audio — display each as it arrives |
 | `npc_responded` | `{text}` | NPC response complete (non-streaming fallback) |
 | `current_emotion` | string | Current NPC emotion name (per-user, during describe) |
 | `send_cur_emotion` | string | Current NPC emotion name (broadcast) |
@@ -352,27 +354,26 @@ skipped.
 
 Text and audio are streamed sentence-by-sentence (split on `.?!`). Each sentence
 triggers:
-1. `npc_audio_stop` — flush previous audio
-2. `npc_text_token` — clean text (DO NOT display — arrives BEFORE audio)
-3. Multiple `npc_audio_chunk` emits — base64 MP3 in 32KB chunks
-4. `npc_word_timings` — `{words: [{word, start, end}]}` for synced display
-5. `npc_audio_done` — per-sentence audio complete
+1. `npc_text_token` — clean text (DO NOT display — arrives BEFORE audio)
+2. Multiple `npc_audio_chunk` emits — base64 MP3 in 32KB chunks
+3. `npc_audio_done` — per-sentence audio complete
+4. Multiple `show_word` emits — `{word}` one word at a time, server-timed to align with audio playback
 
 If the player sends input mid-stream, `cancel_stream` is set and the stream
 aborts immediately.
 
 ### Word-timed text display (closed captions)
 
-The server now emits `npc_word_timings` after each sentence's audio. **Unreal
-must display text from this event, NOT from `npc_text_token`.** Here's why:
+The server emits `show_word` events timed to audio playback. **Unreal must
+display text from these events, NOT from `npc_text_token`.** Here's why:
 
 - `npc_text_token` arrives **before** TTS generation — so text appeared
   seconds before audio.
-- `npc_word_timings` carries per-word `start`/`end` times (seconds) from
-  ElevenLabs character-level alignment.
-- Unreal should store the word array, then on each **Tick** check the
-  audio component's `GetPlaybackTime()` and display only words where
-  `start <= currentTime`.
+- `show_word` emits `{word}` one word at a time, server-timed using
+  ElevenLabs character-level alignment so each word arrives in sync
+  with the audio playback.
+- Unreal simply appends each arriving word to the display text widget
+  — no Tick polling or `GetPlaybackTime()` needed.
 
 Full implementation guide: [`unreal/BLUEPRINT_GUIDE.md`](unreal/BLUEPRINT_GUIDE.md)
 

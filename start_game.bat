@@ -26,6 +26,7 @@ for /f "usebackq tokens=1,2 delims==" %%a in (".env") do (
     if "%%a"=="DB_HOST"    set "DB_HOST=%%b"
     if "%%a"=="DB_PORT"    set "DB_PORT=%%b"
     if "%%a"=="DB_SSL_CA"  set "DB_SSL_CA=%%b"
+    if "%%a"=="DEBUG_SHORT_RESPONSES" set "DEBUG_SHORT=%%b"
 )
 
 if "%DB_PASS%"=="" echo   WARNING: DB_PASSWORD not found in .env, using empty
@@ -35,12 +36,26 @@ if "%DB_HOST%"=="" set "DB_HOST=localhost"
 if "%DB_PORT%"=="" set "DB_PORT=3306"
 if "%DB_SSL_CA%"=="" set "DB_SSL_CA=isrg-root-x1.pem"
 
-echo   DB: %DB_USER%@%DB_HOST%:%DB_PORT%/%DB_NAME%
-if exist "%DB_SSL_CA%" (
-    echo   SSL CA: %DB_SSL_CA%
-) else (
-    echo   WARNING: SSL CA file not found: %DB_SSL_CA% - proceeding without SSL
+:: --- debug mode: skip remote DB, use local ---
+if not "%DEBUG_SHORT%"=="" (
+    echo.
+    echo   *** DEBUG MODE: overriding DB to localhost ***
+    echo   DEBUG_SHORT_RESPONSES = %DEBUG_SHORT%
+    set "DB_HOST=localhost"
+    set "DB_PORT=3306"
+    set "DB_USER=root"
+    set "DB_PASS=4119"
     set "DB_SSL_CA="
+)
+
+echo   DB: %DB_USER%@%DB_HOST%:%DB_PORT%/%DB_NAME%
+if not "%DB_SSL_CA%"=="" (
+    if exist "%DB_SSL_CA%" (
+        echo   SSL CA: %DB_SSL_CA%
+    ) else (
+        echo   WARNING: SSL CA file not found: %DB_SSL_CA% - proceeding without SSL
+        set "DB_SSL_CA="
+    )
 )
 
 :: ------------------------------------------------------------------

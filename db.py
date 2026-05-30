@@ -22,23 +22,39 @@ def _get_pool() -> MySQLConnectionPool:
     """Lazy-initialize and return the connection pool."""
     global _pool
     if _pool is None:
-        ssl_ca = os.getenv("DB_SSL_CA")
-        ssl_config = {}
-        if ssl_ca:
-            ssl_config = {
-                "ssl_ca": ssl_ca,
-                "ssl_verify_cert": True,
-                "ssl_verify_identity": True,
-            }
+        # --- debug mode: force local DB, no SSL ---
+        _debug = os.getenv("DEBUG_SHORT_RESPONSES")
+        if _debug:
+            print(f"[db] DEBUG_SHORT_RESPONSES set — using local DB (root@localhost:3306)")
+            ssl_config = {}
+            _user = "root"
+            _password = "4119"
+            _database = os.getenv("DB_NAME", "camodb")
+            _host = "localhost"
+            _port = 3306
+        else:
+            ssl_ca = os.getenv("DB_SSL_CA")
+            ssl_config = {}
+            if ssl_ca:
+                ssl_config = {
+                    "ssl_ca": ssl_ca,
+                    "ssl_verify_cert": True,
+                    "ssl_verify_identity": True,
+                }
+            _user = os.getenv("DB_USER")
+            _password = os.getenv("DB_PASSWORD")
+            _database = os.getenv("DB_NAME")
+            _host = os.getenv("DB_HOST", "localhost")
+            _port = int(os.getenv("DB_PORT", "3306"))
         _pool = MySQLConnectionPool(
             pool_name="emotion_game_pool",
             pool_size=5,
             pool_reset_session=True,
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            database=os.getenv("DB_NAME"),
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", "3306")),
+            user=_user,
+            password=_password,
+            database=_database,
+            host=_host,
+            port=_port,
             **ssl_config,
         )
     return _pool

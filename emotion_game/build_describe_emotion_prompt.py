@@ -8,7 +8,9 @@ def build_describe_emotion_prompt(t : EmotionGameTurn) -> str:
 
     db = connect()
     cursor = db.cursor(dictionary=True)
-    idx = random.randint(0, 2)   # inclusive
+    idx = random.randint(0, 2)
+    if not t.cues:
+        t.cues = ["You feel something.", "An emotion stirs within you.", "You notice a feeling inside."]
     selected_cue = t.cues[idx]
 
     print("\nPROMPT DEBUG. cues == ", t.cues)

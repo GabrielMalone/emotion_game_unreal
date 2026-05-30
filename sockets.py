@@ -70,8 +70,11 @@ def init_socket_events(app):
         if turn._lock.locked():
             _log("[player_input] ignored — stream in progress")
             return
-        turn.cancel_stream = True
-        sio.emit("npc_audio_stop", {}, room=f"user:{turn.idUser}")
+        # Only cancel if a stream is actually in progress, otherwise
+        # we kill _emit_words background tasks from a stream that
+        # already finished naturally (breaks lip sync).
+        if turn.streaming:
+            turn.cancel_stream = True
         advance_game(turn, data.get("player_text", ""), data.get("last_npc_text", ""), sio=sio)
 
     @sio.on("npc_audio_ready")

@@ -1,5 +1,6 @@
 import openAIqueries
 import base64
+import os
 import re
 import time
 from turnContext import EmotionGameTurn
@@ -20,11 +21,12 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     SENTENCE_END = {".", "?", "!"}
     speechOn = True
 
-    # Clear any stale cancel flag from a previous walk-away that
-    # didn't coincide with an active stream.
+    # Clear any stale cancel flag from a previous walk-away.
     t.cancel_stream = False
     t.streaming = True
-    t.word_gen = getattr(t, "word_gen", 0) + 1   # generation counter for word tasks
+    # Always bump word_gen so old _emit_words tasks from any
+    # previous stream (natural or interrupted) are cancelled.
+    t.word_gen = getattr(t, "word_gen", 0) + 1
 
     # ------------------------------------------------------------------
     # Safe emit helper
@@ -95,16 +97,22 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
         # Spawn a background task NOW so words start firing immediately
         # (or after previous audio, thanks to sentence_start offset).
         def _emit_words():
-            gen = t.word_gen
-            for w in word_timings:
-                if t.word_gen != gen or t.cancel_stream:
-                    break
-                delay = (sentence_start + w["start"]) - time.time()
-                if delay > 0:
-                    sio.sleep(delay)
-                if t.word_gen != gen or t.cancel_stream:
-                    break
-                _emit("show_word", {"word": w["word"]})
+            try:
+                gen = t.word_gen
+                for w in word_timings:
+                    if t.word_gen != gen or t.cancel_stream:
+                        break
+                    delay = (sentence_start + w["start"]) - time.time()
+                    if delay > 0:
+                        sio.sleep(delay)
+                    if t.word_gen != gen or t.cancel_stream:
+                        break
+                    if not _emit("show_word", {"word": w["word"]}):
+                        break
+            except Exception as e:
+                print(f"[_emit_words] background task crashed: {e}")
+                import traceback
+                traceback.print_exc()
 
         sio.start_background_task(_emit_words)
 
@@ -113,7 +121,28 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     # ----------------------------------------------------------
     # stream text + audio (closed-captioning style)
     # ----------------------------------------------------------
-    for token in openAIqueries.getResponseStream(t, client):
+    _t0 = time.time()
+    _first_token = False
+
+    # --- debug: short-circuit NPC output to a few words ---
+    _debug_short = os.getenv("DEBUG_SHORT_RESPONSES")
+    if _debug_short:
+        _debug_text = _debug_short if _debug_short.strip() else "Hello there."
+        print(f"[DEBUG] Short-circuiting NPC response to: {_debug_text!r}")
+        # wrap in a generator to mimic OpenAI streaming
+        def _debug_gen(text: str):
+            # yield sentence-ending punctuation immediately so
+            # the sentence-processing loop fires without waiting
+            for ch in text:
+                yield ch
+        _stream = _debug_gen(_debug_text)
+    else:
+        _stream = openAIqueries.getResponseStream(t, client)
+
+    for token in _stream:
+        if not _first_token:
+            _first_token = True
+            print(f"[TIMING] gpt-4o first token in {time.time() - _t0:.1f}s")
         # --- player walked away or socket died? abort immediately ---
         if t.cancel_stream:
             _emit("stream_cancelled")

@@ -64,5 +64,35 @@ def get_NPC_user_memory():
     )
 
 # --------------------------------------------------
+# Pre-warm: generate emotion cues at startup so the
+# first player interaction doesn't pay a blocking
+# gpt-4o-mini call (~3-5s) before streaming starts.
+# --------------------------------------------------
+def _warmup_apis():
+    import threading
+    def _warm():
+        # --- OpenAI: pre-generate emotion cues ---
+        try:
+            from llm_client import client as openai_client
+            import openAIqueries
+            openAIqueries.prewarm_cue_cache(openai_client)
+        except Exception as e:
+            print(f"[warmup] cue-cache failed (non-fatal): {e}")
+
+        # --- ElevenLabs: fire a real TTS call to warm httpx connection pool ---
+        try:
+            from elevenlabsQueries import tts
+            gen = tts("hello", "XB0fDUnXU5powFXDhCwa", "neutral")
+            for _ in gen:  # consume the stream fully
+                pass
+            print("[warmup] ElevenLabs connection established")
+        except Exception as e:
+            print(f"[warmup] ElevenLabs failed (non-fatal): {e}")
+
+    t = threading.Thread(target=_warm, daemon=True)
+    t.start()
+
+# --------------------------------------------------
 if __name__ == "__main__":
+    _warmup_apis()
     sio.run(camo, host="0.0.0.0", port=5001, debug=True, use_reloader=False, allow_unsafe_werkzeug=True)
