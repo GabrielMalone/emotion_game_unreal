@@ -6,7 +6,7 @@ from emotionGameQueries import assign_next_emotion
 import openAIqueries
 from llm_client import client
 from turnContext import EmotionGameTurn
-from emotionGameQueries import get_active_emotion
+from emotionGameQueries import get_active_emotion, get_remaining_emotions
 from db import connect, get_cursor
 # -----------------------------------------------------------------------------------
 # config
@@ -111,6 +111,7 @@ def _start_game_impl(sio):
         turn.game_started = True
         turn.guessing_started = True
         sio.emit("game_start", {}, room=f"user:{turn.idUser}")
+        sio.emit("remaining_emotions", {"remaining_emotions": get_remaining_emotions(turn)}, room=f"user:{turn.idUser}")
         player_guess(turn, sio)
         return
 
@@ -141,6 +142,7 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
         turn.game_started = True
         turn.guessing_started = False
         sio.emit("game_start", {}, room=f"user:{turn.idUser}")
+        sio.emit("remaining_emotions", {"remaining_emotions": get_remaining_emotions(turn)}, room=f"user:{turn.idUser}")
 
     # -------- ASSIGN / DESCRIBE --------
     if not turn.guessing_started:

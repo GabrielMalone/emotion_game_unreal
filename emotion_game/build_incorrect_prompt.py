@@ -100,12 +100,22 @@ def build_incorrect_prompt(t : EmotionGameTurn) -> str:
         - Do not repeat metaphors or examples from earlier interactions.
         - End your response by inviting the player to guess the emotion.
         - Ask only ONE simple question at the end.
+        """
 
-        CUES
-        -------------
-        - Cue 1: {t.cues[0]}
-        - Cue 2: {t.cues[1]}
-        - Cue 3: {t.cues[2]}
+        # --------------------------------------------------
+        # CUES (with safety fallback if t.cues is None/empty)
+        # --------------------------------------------------
+        cues = t.cues
+        if not cues:
+            cues = ["a flutter in your chest", "a heavy feeling", "a shiver down your spine"]
+
+        prompt += f"""
+
+            CUES
+            -------------
+            - Cue 1: {cues[0]}
+            - Cue 2: {cues[1]}
+            - Cue 3: {cues[2]}
 
         RESPONSE STYLE
         --------------

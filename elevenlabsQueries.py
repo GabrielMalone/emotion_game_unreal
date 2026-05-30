@@ -24,12 +24,12 @@ _eleven = ElevenLabs(
 EMOTION_VOICE_SETTINGS = {
     "happy":     VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.55, speed=1.10),
     "excited":   VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.60, speed=1.20),
-    "surprised": VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.55, speed=1.20),
-    "sad":       VoiceSettings(stability=0.28, similarity_boost=0.75, style=0.45, speed=0.82),
+    "surprised": VoiceSettings(stability=0.15, similarity_boost=0.75, style=0.65, speed=1.20),
+    "sad":       VoiceSettings(stability=0.20, similarity_boost=0.75, style=0.50, speed=0.75),
     "angry":     VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.60, speed=1.20),
-    "afraid":    VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.50, speed=1.10),
-    "disgusted": VoiceSettings(stability=0.24, similarity_boost=0.75, style=0.50, speed=0.92),
-    "calm":      VoiceSettings(stability=0.32, similarity_boost=0.75, style=0.38, speed=0.88),
+    "afraid":    VoiceSettings(stability=0.15, similarity_boost=0.75, style=0.55, speed=0.90),
+    "disgusted": VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.55, speed=0.88),
+    "calm":      VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.30, speed=0.78),
     "neutral":   VoiceSettings(stability=0.35, similarity_boost=0.75, style=0.32, speed=1.00),
     "worried":   VoiceSettings(stability=0.25, similarity_boost=0.75, style=0.48, speed=0.95),
 }
@@ -345,12 +345,21 @@ def _apply_audio_tags(text: str, emotion: str) -> str:
         return text
 
     # --- tag each sentence ----------------------------------------------------
+    # Emotions that are naturally subdued and benefit from extra tag emphasis
+    # on short text. angry/happy/excited are already expressive and don't need
+    # the stacking boost — it makes them sound overcooked.
+    _SUBTLE_EMOTIONS = {"sad", "afraid", "surprised", "disgusted", "calm", "worried", "neutral"}
+    _is_short = len(sentences) <= 2
+
     tagged_parts = []
     for i, sentence in enumerate(sentences):
         # ---- determine coverage for this sentence ----
         # First sentence always gets emotional framing.
-        # Others get 50-65% coverage for natural variation.
-        if i == 0:
+        # Short text: tag every sentence for max expressiveness.
+        # Longer text: ~55% coverage for natural variation.
+        if _is_short:
+            tag_it = True
+        elif i == 0:
             tag_it = True
         else:
             tag_it = random.random() < 0.55  # ~55% coverage
@@ -366,8 +375,16 @@ def _apply_audio_tags(text: str, emotion: str) -> str:
         etag = random.choice(emotion_tags)
         chosen_tags.append(etag)
 
+        # For subtle emotions on very short text, layer a second emotion tag
+        # for stronger signal. Each tag affects ~4-5 words.
+        if (_is_short and emotion in _SUBTLE_EMOTIONS
+                and len(sentence.split()) <= 8 and len(emotion_tags) >= 2):
+            etag2 = random.choice([t for t in emotion_tags if t != etag])
+            chosen_tags.append(etag2)
+
         # Non-verbal reaction (prepend or postpend based on type)
-        if reaction_tags and random.random() < 0.20:
+        _reaction_prob = 0.45 if (_is_short and emotion in _SUBTLE_EMOTIONS) else 0.20
+        if reaction_tags and random.random() < _reaction_prob:
             rtag = random.choice(reaction_tags)
             # Reactions like [laughs], [sighs], [gasps] work well AFTER
             # the sentence. Others like [whispers], [gulps] work before.
@@ -388,7 +405,8 @@ def _apply_audio_tags(text: str, emotion: str) -> str:
                 chosen_tags.append(rtag)
 
         # Pacing/hesitation tag — randomly inserted for hesitant emotions
-        if pacing_tags and random.random() < 0.15:
+        _pacing_prob = 0.30 if (_is_short and emotion in _SUBTLE_EMOTIONS) else 0.15
+        if pacing_tags and random.random() < _pacing_prob:
             ptag = random.choice(pacing_tags)
             # [hesitates], [stammers], [pause] work best mid-sentence
             # Place them between words in the first half of the sentence

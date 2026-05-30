@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from db import connect; conn=connect(); cur=conn.cursor(); cur.execute('SELECT COUNT(*) FROM npc'); print('NPCs:', cur.fetchone()[0]); cur.execute('SELECT COUNT(*) FROM user'); print('Users:', cur.fetchone()[0]); cur.execute('SELECT COUNT(*) FROM emotion'); print('Emotions:', cur.fetchone()[0]); cur.close(); conn.close(); print('FULL TEST PASSED')
+    ^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'db'

@@ -1,0 +1,2 @@
+NPCs: 1
+CONNECTION OK

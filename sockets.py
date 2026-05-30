@@ -19,6 +19,9 @@ from db import connect
 
 sio = SocketIO(cors_allowed_origins="*")
 
+# --- audio-streaming gate: block player input while Unreal plays NPC audio ---
+_AUDIO_STREAMING = False
+
 def init_socket_events(app):
 
     sio.init_app(app)
@@ -64,6 +67,10 @@ def init_socket_events(app):
         if not data:
             _log("[player_input] empty data, ignoring")
             return
+        # --- block input while Unreal is still playing NPC audio ---
+        if _AUDIO_STREAMING:
+            _log("[player_input] ignored — audio still streaming in Unreal")
+            return
         turn = active_turns[idUser]
         # If a turn is already running (lock held), ignore duplicate
         # player_inputs — cancelling mid-stream causes empty responses.
@@ -76,6 +83,20 @@ def init_socket_events(app):
         if turn.streaming:
             turn.cancel_stream = True
         advance_game(turn, data.get("player_text", ""), data.get("last_npc_text", ""), sio=sio)
+
+    @sio.on("unreal_audio_is_streaming")
+    def on_audio_streaming_start(data=None):
+        global _AUDIO_STREAMING
+        if not _AUDIO_STREAMING:
+            _AUDIO_STREAMING = True
+            _log("[audio_gate] BLOCKED player input")
+
+    @sio.on("unreal_audio_done_streaming")
+    def on_audio_streaming_done(data=None):
+        global _AUDIO_STREAMING
+        if _AUDIO_STREAMING:
+            _AUDIO_STREAMING = False
+            _log("[audio_gate] UNBLOCKED player input")
 
     @sio.on("npc_audio_ready")
     def on_npc_audio_ready(sid=None):

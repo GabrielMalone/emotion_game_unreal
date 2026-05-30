@@ -6,7 +6,7 @@ from emotion_game.build_answered_all_correctly_prompt import build_end_round_pro
 from flask import request
 from llm_client import client
 from turnContext import EmotionGameTurn
-from emotionGameQueries import mark_emotion_guessed_correct, get_active_emotion, get_num_correct
+from emotionGameQueries import mark_emotion_guessed_correct, get_active_emotion, get_num_correct, get_remaining_emotions
 from emotion_game.build_describe_emotion_prompt import build_describe_emotion_prompt
 from emotion_game.build_did_not_make_guess_prompt import build_no_guess_prompt
 from emotion_game.get_NPC_mem import getNPCmem
@@ -64,6 +64,11 @@ def player_guess(turn: EmotionGameTurn, socketio) -> str:
         num_correct = get_num_correct(turn)
         try:
             socketio.emit("correct", num_correct)
+        except Exception:
+            pass
+        try:
+            remaining = get_remaining_emotions(turn)
+            socketio.emit("remaining_emotions", {"remaining_emotions": remaining}, room=f"user:{turn.idUser}")
         except Exception:
             pass
         # update npc memory about this event

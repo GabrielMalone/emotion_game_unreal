@@ -1,0 +1,20 @@
+  Starting camo_server.py on http://0.0.0.0:5001
+================================================================
+
+=== sockets.py loaded ===
+Traceback (most recent call last):
+  File "F:\emotion_game_unreal\camo_server.py", line 30, in <module>
+    from sockets import sio, init_socket_events
+  File "F:\emotion_game_unreal\sockets.py", line 16, in <module>
+    from UnrealPhase1 import active_turns, start_game, advance_game, currentScene, idUser, voiceId
+  File "F:\emotion_game_unreal\UnrealPhase1.py", line 2, in <module>
+    from emotion_game.npc_introduce import npc_introduce, agree_check, player_disagreed
+  File "F:\emotion_game_unreal\emotion_game\npc_introduce.py", line 11, in <module>
+    from emotion_game.player_guess import player_guess
+  File "F:\emotion_game_unreal\emotion_game\player_guess.py", line 4, in <module>
+    from emotion_game.build_incorrect_prompt import build_incorrect_prompt
+  File "F:\emotion_game_unreal\emotion_game\build_incorrect_prompt.py", line 113
+    CUES
+IndentationError: unexpected indent
+
+camo_server.py exited. Press any key to close.

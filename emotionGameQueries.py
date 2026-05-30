@@ -20,6 +20,28 @@ def mark_emotion_guessed_correct(t: EmotionGameTurn):
         cursor.close()
         db.close()
 #------------------------------------------------------------------
+def get_remaining_emotions(t: EmotionGameTurn) -> list[str]:
+    db = connect()
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT e.emotion
+            FROM emotion e
+            WHERE e.idEmotion NOT IN (
+                SELECT g.idEmotion
+                FROM emotion_guess_game g
+                WHERE g.idUser = %s
+                  AND g.idNPC = %s
+                  AND g.guessed_correctly = 1
+            )
+            ORDER BY e.idEmotion ASC;
+        """, (t.idUser, t.idNPC))
+        rows = cursor.fetchall()
+        return [r["emotion"] for r in rows]
+    finally:
+        cursor.close()
+        db.close()
+#------------------------------------------------------------------
 def get_active_emotion(t: EmotionGameTurn) -> dict | None:
     db = connect()
     try:
