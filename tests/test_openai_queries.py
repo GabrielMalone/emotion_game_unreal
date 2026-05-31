@@ -120,6 +120,7 @@ class TestGetCuesForEmotion:
     """Tests for get_cues_for_emotion (the safe wrapper)."""
 
     def test_returns_generated_cues(self):
+        openAIqueries._CUE_CACHE.pop("happy", None)
         mock_client = MagicMock()
         with patch.object(
             openAIqueries, "generate_emotion_cues", return_value=["a", "b", "c"]
@@ -128,6 +129,7 @@ class TestGetCuesForEmotion:
             assert cues == ["a", "b", "c"]
 
     def test_falls_back_on_error(self):
+        openAIqueries._CUE_CACHE.pop("happy", None)
         mock_client = MagicMock()
         with patch.object(
             openAIqueries,
