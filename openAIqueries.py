@@ -140,8 +140,7 @@ def normalize_emotion(emotion) -> str:
     raise ValueError(f"Invalid emotion: {emotion!r}")
 # ------------------------------------------------------------
 def generate_emotion_cues(emotion: str, client) -> list[str] | None:
-
-    emotion = normalize_emotion(emotion)
+    # Callers (prewarm_cue_cache, get_cues_for_emotion) already normalize.
     print(f"DEBUGGING EMOTION SETTING {emotion}")
 
     system = (

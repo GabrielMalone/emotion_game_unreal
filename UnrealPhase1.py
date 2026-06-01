@@ -1,4 +1,5 @@
 import os
+import logging
 from emotion_game.npc_introduce import npc_introduce, agree_check, player_disagreed
 from emotion_game.npc_describe_emotion import npc_describe_emotion
 from emotion_game.player_guess import player_guess
@@ -7,7 +8,10 @@ import openAIqueries
 from llm_client import client
 from turnContext import EmotionGameTurn
 from emotionGameQueries import get_active_emotion, get_remaining_emotions
-from db import connect, get_cursor
+from db import get_cursor
+
+logger = logging.getLogger(__name__)
+
 # -----------------------------------------------------------------------------------
 # config
 # -----------------------------------------------------------------------------------
@@ -30,12 +34,12 @@ currentScene = """
       happy, sad, angry, afraid, surprised, disgusted, calm, excited
     - Never begin a sentence with the word "This" by itself.
         Always use a clear noun phrase such as:
-        "This feeling…", "What I’m feeling now…", or
+        "This feeling…", "What I'm feeling now…", or
         "The way my body feels right now…"
 """
 voiceId = os.environ.get("NPC_VOICE_ID", "XB0fDUnXU5powFXDhCwa")  # Charlotte — natural, expressive, best v3 emotional range
 SERVER  = "http://localhost:5001"
-active_turns = {} # this will be persistent for the lifetime of the socketio instance
+active_turns = {}  # this will be persistent for the lifetime of the socketio instance
 turn = EmotionGameTurn(
     idUser=idUser,
     idNPC=idNPC,
@@ -46,10 +50,9 @@ turn = EmotionGameTurn(
     player_name="Gabriel"
 )
 active_turns[idUser] = turn
+
 # -----------------------------------------------------------------------------------
-# instead of a game loop, we now start the game with an overlap or whataver you wan
-# event in unreal. Then we send this initializing data to the flask server
-# and then that handles the db logic from there
+# Game state machine — event-driven by Unreal socket events.
 # -----------------------------------------------------------------------------------
 def assignEmotion(turn, sio):
     emotion = assign_next_emotion(turn)
@@ -63,6 +66,7 @@ def assignEmotion(turn, sio):
     )
     npc_describe_emotion(turn, sio=sio)
     turn.guessing_started = True
+
 # -----------------------------------------------------------------------------------
 def start_game(sio, player_name: str = None):
     if player_name is None:
@@ -73,11 +77,13 @@ def start_game(sio, player_name: str = None):
 
     # Acquire the turn lock so no emotion clicks sneak in during intro
     if not turn._lock.acquire(blocking=False):
-        print("[start_game] ignored — another turn in progress")
+        logger.debug("[start_game] ignored — another turn in progress")
         return
+    turn.turn_in_progress = True
     try:
         _start_game_impl(sio)
     finally:
+        turn.turn_in_progress = False
         turn._lock.release()
 
 
@@ -104,9 +110,9 @@ def _start_game_impl(sio):
         turn.game_over = True
         player_guess(turn, sio)
         return
-    
+
     res = get_active_emotion(turn)
-    if res:    
+    if res:
         turn.cur_npc_emotion = res["emotion"]
         turn.game_started = True
         turn.guessing_started = True
@@ -116,15 +122,18 @@ def _start_game_impl(sio):
         return
 
     npc_introduce(turn, sio)
+
 # -----------------------------------------------------------------------------------
 def advance_game(turn, player_text, npc_text, sio):
     """Thread-safe wrapper: only one turn can run at a time."""
     if not turn._lock.acquire(timeout=5):
-        print("[advance_game] ignored — another turn in progress (timeout)")
+        logger.debug("[advance_game] ignored — another turn in progress (timeout)")
         return
+    turn.turn_in_progress = True
     try:
         _advance_game_impl(turn, player_text, npc_text, sio)
     finally:
+        turn.turn_in_progress = False
         turn._lock.release()
 
 
@@ -134,7 +143,7 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
     turn.last_npc_text = npc_text
     # -------- AGREEMENT PHASE --------
     if not turn.game_started:
-        
+
         if not agree_check(turn):
             player_disagreed(turn, sio=sio)
             return
@@ -148,7 +157,7 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
     if not turn.guessing_started:
         assignEmotion(turn, sio)
         return
- 
+
     # -------- PLAYER GUESS --------
     turn.player_text = player_text
     res = player_guess(turn, socketio=sio)
@@ -165,4 +174,3 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
 
     if res["status"] == "End":
         return
-# -----------------------------------------------------------------------------------

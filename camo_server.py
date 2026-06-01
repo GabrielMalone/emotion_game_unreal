@@ -1,7 +1,18 @@
+import logging
+import os
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
-import os
+
+# ------------------------------------------------------------------
+# Logging setup — all modules use logging.getLogger(__name__)
+# ------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.DEBUG if os.getenv("DEBUG", "") else logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("camo_server")
 
 # ------------------------------------------------------------------
 # Monkey-patch werkzeug to survive WebSocket disconnect during
@@ -77,7 +88,7 @@ def _warmup_apis():
             import openAIqueries
             openAIqueries.prewarm_cue_cache(openai_client)
         except Exception as e:
-            print(f"[warmup] cue-cache failed (non-fatal): {e}")
+            log.warning(f"cue-cache warmup failed (non-fatal): {e}")
 
         # --- ElevenLabs: fire a real TTS call to warm httpx connection pool ---
         try:
@@ -85,9 +96,9 @@ def _warmup_apis():
             gen = tts("hello", "XB0fDUnXU5powFXDhCwa", "neutral")
             for _ in gen:  # consume the stream fully
                 pass
-            print("[warmup] ElevenLabs connection established")
+            log.info("ElevenLabs connection established")
         except Exception as e:
-            print(f"[warmup] ElevenLabs failed (non-fatal): {e}")
+            log.warning(f"ElevenLabs warmup failed (non-fatal): {e}")
 
     t = threading.Thread(target=_warm, daemon=True)
     t.start()
@@ -95,4 +106,20 @@ def _warmup_apis():
 # --------------------------------------------------
 if __name__ == "__main__":
     _warmup_apis()
-    sio.run(camo, host="0.0.0.0", port=5001, debug=True, use_reloader=False, allow_unsafe_werkzeug=True)
+
+    # --- Production safety gates ---
+    debug_mode = os.getenv("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
+    unsafe_werkzeug = os.getenv("ALLOW_UNSAFE_WERKZEUG", "").lower() in ("1", "true", "yes")
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "5001"))
+
+    log.info(f"Starting on {host}:{port}  debug={debug_mode}  allow_unsafe_werkzeug={unsafe_werkzeug}")
+
+    sio.run(
+        camo,
+        host=host,
+        port=port,
+        debug=debug_mode,
+        use_reloader=False,
+        allow_unsafe_werkzeug=unsafe_werkzeug,
+    )

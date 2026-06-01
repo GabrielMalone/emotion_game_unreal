@@ -1,15 +1,9 @@
 from flask import jsonify
-import mysql.connector
-from turnContext import EmotionGameTurn
-from db import connect
+from db import get_cursor
 
-#------------------------------------------------------------------
+
 def update_NPC_user_memory_query(idNPC: int, idUser: int, kbText: str):
-    db = connect()
-    if not db.is_connected():
-        return jsonify({"status": "error", "message": "database unavailable"}), 503
-    try:
-        cursor = db.cursor()
+    with get_cursor() as (db, cursor):
         query = """
             INSERT INTO npc_user_memory (idNPC, idUser, kbText, updatedAt)
             VALUES (%s, %s, %s, NOW())
@@ -26,21 +20,10 @@ def update_NPC_user_memory_query(idNPC: int, idUser: int, kbText: str):
         cursor.execute(query, (idNPC, idUser, kbText))
         db.commit()
         return jsonify({"status": "success"}), 200
-    except mysql.connector.Error as err:
-        db.rollback()
-        print("MySQL Error:", err)
-        return jsonify({"status": "error"}), 500
-    finally:
-        cursor.close()
-        db.close()
 
-#------------------------------------------------------------------
+
 def get_NPC_user_memory_query(idUser: int, idNPC: int):
-    db = connect()
-    if not db.is_connected():
-        return
-    try:
-        cursor = db.cursor(dictionary=True)
+    with get_cursor(dictionary=True) as (_db, cursor):
         query = """
         SELECT
           kbText,
@@ -52,9 +35,3 @@ def get_NPC_user_memory_query(idUser: int, idNPC: int):
         cursor.execute(query, (idNPC, idUser))
         row = cursor.fetchone()
         return jsonify({"memory": row}), 200
-    except mysql.connector.Error as err:
-        print("MySQL Error:", err)
-        return jsonify({"status": "error"}), 500
-    finally:
-        cursor.close()
-        db.close()

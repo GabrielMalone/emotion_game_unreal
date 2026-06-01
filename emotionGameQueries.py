@@ -1,11 +1,9 @@
-import mysql.connector
 from turnContext import EmotionGameTurn
-from db import connect
-#------------------------------------------------------------------
+from db import get_cursor
+
+# ------------------------------------------------------------------
 def mark_emotion_guessed_correct(t: EmotionGameTurn):
-    db = connect()
-    try:
-        cursor = db.cursor()
+    with get_cursor() as (db, cursor):
         cursor.execute("""
             UPDATE emotion_guess_game
             SET guessed_correctly = 1,
@@ -16,14 +14,10 @@ def mark_emotion_guessed_correct(t: EmotionGameTurn):
             AND active = 1;
         """, (t.idUser, t.idNPC))
         db.commit()
-    finally:
-        cursor.close()
-        db.close()
-#------------------------------------------------------------------
+
+# ------------------------------------------------------------------
 def get_remaining_emotions(t: EmotionGameTurn) -> list[str]:
-    db = connect()
-    try:
-        cursor = db.cursor(dictionary=True)
+    with get_cursor(dictionary=True) as (_db, cursor):
         cursor.execute("""
             SELECT e.emotion
             FROM emotion e
@@ -38,14 +32,10 @@ def get_remaining_emotions(t: EmotionGameTurn) -> list[str]:
         """, (t.idUser, t.idNPC))
         rows = cursor.fetchall()
         return [r["emotion"] for r in rows]
-    finally:
-        cursor.close()
-        db.close()
-#------------------------------------------------------------------
+
+# ------------------------------------------------------------------
 def get_active_emotion(t: EmotionGameTurn) -> dict | None:
-    db = connect()
-    try:
-        cursor = db.cursor(dictionary=True)
+    with get_cursor(dictionary=True) as (_db, cursor):
         cursor.execute("""
             SELECT e.idEmotion, e.emotion
             FROM emotion_guess_game g
@@ -56,17 +46,10 @@ def get_active_emotion(t: EmotionGameTurn) -> dict | None:
             LIMIT 1;
         """, (t.idUser, t.idNPC))
         return cursor.fetchone()
-    except mysql.connector.Error as err:
-        print("MySQL Error:", err)
-        return None
-    finally:
-        cursor.close()
-        db.close()
-#------------------------------------------------------------------
+
+# ------------------------------------------------------------------
 def get_num_correct(t: EmotionGameTurn) -> dict | None:
-    db = connect()
-    try:
-        cursor = db.cursor(dictionary=True)
+    with get_cursor(dictionary=True) as (_db, cursor):
         cursor.execute("""
             SELECT COUNT(*) AS num_correct
             FROM emotion_guess_game
@@ -74,20 +57,11 @@ def get_num_correct(t: EmotionGameTurn) -> dict | None:
               AND idNPC = %s
               AND guessed_correctly = 1;
         """, (t.idUser, t.idNPC))
-
         return cursor.fetchone()
 
-    except mysql.connector.Error as err:
-        print("MySQL Error:", err)
-        return None
-    finally:
-        cursor.close()
-        db.close()
-#------------------------------------------------------------------
+# ------------------------------------------------------------------
 def assign_next_emotion(t: EmotionGameTurn):
-    db = connect()
-    try:
-        cursor = db.cursor(dictionary=True)
+    with get_cursor(dictionary=True) as (db, cursor):
 
         # 1. Deactivate any currently active emotion (safety)
         cursor.execute("""
@@ -131,12 +105,3 @@ def assign_next_emotion(t: EmotionGameTurn):
 
         db.commit()
         return emotion
-
-    except mysql.connector.Error as err:
-        db.rollback()
-        print("MySQL Error:", err)
-        return None
-
-    finally:
-        cursor.close()
-        db.close()

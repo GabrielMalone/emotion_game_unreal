@@ -1,3 +1,4 @@
+import logging
 import openAIqueries
 import base64
 import os
@@ -5,6 +6,8 @@ import re
 import time
 from turnContext import EmotionGameTurn
 from elevenlabsQueries import tts_with_timestamps_cached, _char_alignments_to_words
+
+logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 32_768  # 32 KB
 
@@ -26,10 +29,10 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     t.streaming = True
     # Always bump word_gen so old _emit_words tasks from any
     # previous stream (natural or interrupted) are cancelled.
-    t.word_gen = getattr(t, "word_gen", 0) + 1
+    t.word_gen += 1
 
     # ------------------------------------------------------------------
-    # Safe emit helper
+    # Safe emit helper — logs errors without destroying the stream
     # ------------------------------------------------------------------
     def _emit(event: str, data: dict | None = None) -> bool:
         if data is None:
@@ -37,13 +40,10 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
         try:
             sio.emit(event, data, room=f"user:{t.idUser}")
             return True
-        except Exception:
+        except Exception as e:
+            logger.warning(f"_emit failed for event '{event}': {e}")
             t.cancel_stream = True
             return False
-
-    # Don't emit npc_audio_stop here — it kills lipsync in Unreal.
-    # Old-audio cleanup is handled by t.word_gen (cancels old word
-    # tasks) and Unreal's own audio queuing.
 
     # When the last queued audio chunk will finish playing in Unreal.
     # Each sentence's word task uses max(ref, cumulative_end) so its
@@ -110,9 +110,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
                     if not _emit("show_word", {"word": w["word"]}):
                         break
             except Exception as e:
-                print(f"[_emit_words] background task crashed: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.error(f"[_emit_words] background task crashed: {e}", exc_info=True)
 
         sio.start_background_task(_emit_words)
 
@@ -128,7 +126,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     _debug_short = os.getenv("DEBUG_SHORT_RESPONSES")
     if _debug_short:
         _debug_text = _debug_short if _debug_short.strip() else "Hello there."
-        print(f"[DEBUG] Short-circuiting NPC response to: {_debug_text!r}")
+        logger.debug(f"Short-circuiting NPC response to: {_debug_text!r}")
         # wrap in a generator to mimic OpenAI streaming
         def _debug_gen(text: str):
             # yield sentence-ending punctuation immediately so
@@ -142,7 +140,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     for token in _stream:
         if not _first_token:
             _first_token = True
-            print(f"[TIMING] gpt-4o first token in {time.time() - _t0:.1f}s")
+            logger.info(f"gpt-4o first token in {time.time() - _t0:.1f}s")
         # --- player walked away or socket died? abort immediately ---
         if t.cancel_stream:
             _emit("stream_cancelled")

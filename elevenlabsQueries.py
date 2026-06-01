@@ -141,9 +141,6 @@ def tts_cached(text, voice_id, emotion):
             f.write(chunk)
     print(f"CACHED: {path}")
 
-def speech_to_text(wav_path: str) -> str:
-    pass
-
 # Main TTS function
 def tts(text, voice_id, emotion):
     print("\nTTS DEBUG:\n", voice_id)

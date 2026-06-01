@@ -2,7 +2,6 @@ from emotion_game.build_describe_emotion_prompt import build_describe_emotion_pr
 from phase_2_queries import update_NPC_user_memory_query
 from streamNPCresponse.streamTextResponse import streamResponse
 from emotionGameQueries import get_active_emotion
-from flask import jsonify
 from llm_client import client
 from turnContext import EmotionGameTurn
 
@@ -14,13 +13,12 @@ def npc_describe_emotion(turn: EmotionGameTurn, sio) -> str:
         # stream response from openAI
         turn.cur_npc_emotion = get_active_emotion(turn)["emotion"]
 
-        sio.emit("current_emotion", 
+        sio.emit("current_emotion",
                 turn.cur_npc_emotion,
-                room=f"user:{turn.idUser}"
-        )
+                room=f"user:{turn.idUser}")
 
-        print(f"\nCURRENT EMOTION {turn.cur_npc_emotion} \n")
-        turn.last_npc_text = streamResponse(turn,client=client, sio=sio)
+        print(f"\nCURRENT EMOTION {turn.cur_npc_emotion}\n")
+        turn.last_npc_text = streamResponse(turn, client=client, sio=sio)
         # debug
         print("\nNPC DESCRIBE EMOTION RESPONSE: ", turn.last_npc_text)
         # update npcs kb with its own response
@@ -32,9 +30,9 @@ def npc_describe_emotion(turn: EmotionGameTurn, sio) -> str:
         except Exception:
             pass
 
-        return jsonify({"success": True}), 200
-            
+        return turn.last_npc_text
+
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"success": False, "error": str(e)}), 500
+        return ""

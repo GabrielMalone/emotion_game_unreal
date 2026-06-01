@@ -262,13 +262,13 @@ have the most impact. Charlotte handles low stability without artifacts.
 | Emotion   | Stability | Style | Speed |
 |-----------|-----------|-------|-------|
 | happy     | 0.22      | 0.55  | 1.10  |
-| excited   | 0.18      | 0.60  | 1.30  |
-| surprised | 0.20      | 0.55  | 1.20  |
-| sad       | 0.28      | 0.45  | 0.82  |
-| angry     | 0.18      | 0.60  | 1.35  |
-| afraid    | 0.22      | 0.50  | 1.10  |
-| disgusted | 0.24      | 0.50  | 0.92  |
-| calm      | 0.32      | 0.38  | 0.88  |
+| excited   | 0.18      | 0.60  | 1.20  |
+| surprised | 0.15      | 0.65  | 1.20  |
+| sad       | 0.20      | 0.50  | 0.75  |
+| angry     | 0.18      | 0.60  | 1.20  |
+| afraid    | 0.15      | 0.55  | 0.90  |
+| disgusted | 0.18      | 0.55  | 0.88  |
+| calm      | 0.35      | 0.30  | 0.78  |
 | neutral   | 0.35      | 0.32  | 1.00  |
 | worried   | 0.25      | 0.48  | 0.95  |
 

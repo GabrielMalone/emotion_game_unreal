@@ -22,16 +22,17 @@ def _get_pool() -> MySQLConnectionPool:
     """Lazy-initialize and return the connection pool."""
     global _pool
     if _pool is None:
-        # --- debug mode: force local DB, no SSL ---
+        # --- debug mode: use local DB when DEBUG_SHORT_RESPONSES is set ---
+        # Reads DB credentials from env vars even in debug mode.
         _debug = os.getenv("DEBUG_SHORT_RESPONSES")
         if _debug:
-            print(f"[db] DEBUG_SHORT_RESPONSES set — using local DB (root@localhost:3306)")
+            print("[db] DEBUG_SHORT_RESPONSES set — using local DB")
             ssl_config = {}
-            _user = "root"
-            _password = "4119"
+            _user = os.getenv("DB_USER", "root")
+            _password = os.getenv("DB_DEBUG_PASSWORD") or os.getenv("DB_PASSWORD", "")
             _database = os.getenv("DB_NAME", "camodb")
             _host = "localhost"
-            _port = 3306
+            _port = int(os.getenv("DB_DEBUG_PORT", "3306"))
         else:
             ssl_ca = os.getenv("DB_SSL_CA")
             ssl_config = {}

@@ -1,20 +1,33 @@
-  Starting camo_server.py on http://0.0.0.0:5001
-================================================================
-
-=== sockets.py loaded ===
+TTS DEBUG:
+ XB0fDUnXU5powFXDhCwa
+voiceID: XB0fDUnXU5powFXDhCwa  emotion: neutral
+text: [conversationally][reflectively][clears throat] hello
+2026-06-01 08:25:33 [INFO] httpx: HTTP Request: POST https://api.elevenlabs.io/v1/text-to-speech/XB0fDUnXU5powFXDhCwa "HTTP/1.1 200 OK"
+2026-06-01 08:25:33 [INFO] camo_server: ElevenLabs connection established
+[db] DEBUG_SHORT_RESPONSES set — using local DB
+[db] DEBUG_SHORT_RESPONSES set — using local DB
+Exception in thread Thread-9 (_handle_event_internal):
 Traceback (most recent call last):
-  File "F:\emotion_game_unreal\camo_server.py", line 30, in <module>
-    from sockets import sio, init_socket_events
-  File "F:\emotion_game_unreal\sockets.py", line 16, in <module>
-    from UnrealPhase1 import active_turns, start_game, advance_game, currentScene, idUser, voiceId
-  File "F:\emotion_game_unreal\UnrealPhase1.py", line 2, in <module>
-    from emotion_game.npc_introduce import npc_introduce, agree_check, player_disagreed
-  File "F:\emotion_game_unreal\emotion_game\npc_introduce.py", line 11, in <module>
-    from emotion_game.player_guess import player_guess
-  File "F:\emotion_game_unreal\emotion_game\player_guess.py", line 4, in <module>
-    from emotion_game.build_incorrect_prompt import build_incorrect_prompt
-  File "F:\emotion_game_unreal\emotion_game\build_incorrect_prompt.py", line 113
-    CUES
-IndentationError: unexpected indent
-
-camo_server.py exited. Press any key to close.
+  File "C:\Users\gabem\AppData\Local\Python\pythoncore-3.14-64\Lib\threading.py", line 1082, in _bootstrap_inner
+    self._context.run(self.run)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\gabem\AppData\Local\Python\pythoncore-3.14-64\Lib\threading.py", line 1024, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\emotion_game_unreal\egvenv\Lib\site-packages\socketio\server.py", line 597, in _handle_event_internal
+    r = server._trigger_event(data[0], namespace, sid, *data[1:])
+  File "F:\emotion_game_unreal\egvenv\Lib\site-packages\socketio\server.py", line 623, in _trigger_event
+    return handler(*args)
+  File "F:\emotion_game_unreal\egvenv\Lib\site-packages\flask_socketio\__init__.py", line 306, in _handler
+    return self._handle_event(handler, message, real_ns, sid,
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                              *args)
+                              ^^^^^^
+  File "F:\emotion_game_unreal\egvenv\Lib\site-packages\flask_socketio\__init__.py", line 858, in _handle_event
+    ret = handler(*args)
+  File "F:\emotion_game_unreal\sockets.py", line 150, in getCurEmotion
+    """, (idUser, idNPC))
+                  ^^^^^
+2026-06-01 08:25:37 [INFO] streamNPCresponse.streamTextResponse: gpt-4o first token in 0.0s
+NameError: name 'idNPC' is not defined
+USING CACHE (with timestamps)!

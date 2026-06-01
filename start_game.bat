@@ -26,6 +26,7 @@ for /f "usebackq tokens=1,2 delims==" %%a in (".env") do (
     if "%%a"=="DB_HOST"    set "DB_HOST=%%b"
     if "%%a"=="DB_PORT"    set "DB_PORT=%%b"
     if "%%a"=="DB_SSL_CA"  set "DB_SSL_CA=%%b"
+    if "%%a"=="DB_DEBUG_PASSWORD" set "DB_DEBUG_PASS=%%b"
     if "%%a"=="DEBUG_SHORT_RESPONSES" set "DEBUG_SHORT=%%b"
 )
 
@@ -44,7 +45,7 @@ if not "%DEBUG_SHORT%"=="" (
     set "DB_HOST=localhost"
     set "DB_PORT=3306"
     set "DB_USER=root"
-    set "DB_PASS=4119"
+    if not "%DB_DEBUG_PASS%"=="" set "DB_PASS=%DB_DEBUG_PASS%"
     set "DB_SSL_CA="
 )
 

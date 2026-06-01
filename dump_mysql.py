@@ -1,16 +1,49 @@
-import mysql.connector
-import datetime
+"""Database dump utility — exports camodb schema + data to a .sql file.
+
+Reads credentials from environment variables (same .env as the server).
+Usage:
+    python dump_mysql.py
+    # Writes to ./camodb_dump.sql by default.
+    # Override with DUMP_OUTPUT env var.
+"""
+
 import os
+import datetime
+import mysql.connector
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = int(os.getenv("DB_PORT", "3306"))
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_NAME = os.getenv("DB_NAME", "camodb")
+DB_SSL_CA = os.getenv("DB_SSL_CA", "")
+
+ssl_config = {}
+if DB_SSL_CA and os.path.exists(DB_SSL_CA):
+    ssl_config = {
+        "ssl_ca": DB_SSL_CA,
+        "ssl_verify_cert": True,
+        "ssl_verify_identity": True,
+    }
 
 conn = mysql.connector.connect(
-    host='localhost', user='root', password='4119',
-    database='camodb', charset='utf8mb4', use_unicode=True
+    host=DB_HOST,
+    port=DB_PORT,
+    user=DB_USER,
+    password=DB_PASSWORD,
+    database=DB_NAME,
+    charset="utf8mb4",
+    use_unicode=True,
+    **ssl_config,
 )
 cur = conn.cursor(buffered=True)
 
 out = []
 
-out.append("-- MySQL dump of camodb")
+out.append(f"-- MySQL dump of {DB_NAME}")
 out.append(f"-- Generated: {datetime.datetime.now()}")
 out.append("SET NAMES utf8mb4;")
 out.append("SET FOREIGN_KEY_CHECKS=0;")
@@ -65,8 +98,11 @@ out.append("SET FOREIGN_KEY_CHECKS=1;")
 cur.close()
 conn.close()
 
-# Write to file
-dump_path = r"F:\emotion_game_unreal\camodb_dump.sql"
+# Write to file (configurable path)
+dump_path = os.environ.get(
+    "DUMP_OUTPUT",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "camodb_dump.sql"),
+)
 with open(dump_path, "w", encoding="utf-8") as f:
     f.write("\n".join(out))
 

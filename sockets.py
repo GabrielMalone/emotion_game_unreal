@@ -1,26 +1,43 @@
+import logging
+import os
 import sys
-import datetime
+from datetime import datetime
 
 # ------------------------------------------------------------------
 # LOGGING: write all socket events to a file so we can see what
-# Unreal is actually sending
+# Unreal is actually sending.  Path is configurable via env var.
 # ------------------------------------------------------------------
-def _log(msg):
-    with open("F:/emotion_game_unreal/socket_debug.log", "a") as f:
-        f.write(f"[{datetime.datetime.now().isoformat()}] {msg}\n")
-    print(msg)
+_LOG_PATH = os.environ.get(
+    "SOCKET_DEBUG_LOG",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "socket_debug.log"),
+)
+
+logger = logging.getLogger("sockets")
+
+
+def _log(msg: str) -> None:
+    """Log a message to both the debug file and the logger."""
+    timestamp = datetime.now().isoformat()
+    try:
+        with open(_LOG_PATH, "a") as f:
+            f.write(f"[{timestamp}] {msg}\n")
+    except Exception:
+        pass  # don't let logging failures crash the server
+    logger.debug(msg)
+
 
 _log("=== sockets.py loaded ===")
 
 from flask_socketio import SocketIO, join_room
-from UnrealPhase1 import active_turns, start_game, advance_game, currentScene, idUser, voiceId
+from UnrealPhase1 import active_turns, start_game, advance_game, currentScene, idUser, idNPC, voiceId
 from emotionGameQueries import get_active_emotion, get_num_correct
-from db import connect
+from db import get_cursor
 
 sio = SocketIO(cors_allowed_origins="*")
 
 # --- audio-streaming gate: block player input while Unreal plays NPC audio ---
 _AUDIO_STREAMING = False
+
 
 def init_socket_events(app):
 
@@ -72,10 +89,10 @@ def init_socket_events(app):
             _log("[player_input] ignored — audio still streaming in Unreal")
             return
         turn = active_turns[idUser]
-        # If a turn is already running (lock held), ignore duplicate
-        # player_inputs — cancelling mid-stream causes empty responses.
-        if turn._lock.locked():
-            _log("[player_input] ignored — stream in progress")
+        # Use explicit turn_in_progress flag instead of _lock.locked()
+        # to avoid false-positives when lock is held by unrelated code.
+        if turn.turn_in_progress:
+            _log("[player_input] ignored — turn in progress")
             return
         # Only cancel if a stream is actually in progress, otherwise
         # we kill _emit_words background tasks from a stream that
@@ -121,18 +138,17 @@ def init_socket_events(app):
 
     @sio.on("get_cur_emotion")
     def getCurEmotion(data=None):
-        db = connect()
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT e.emotion
-            FROM emotion_guess_game g
-            JOIN emotion e ON e.idEmotion = g.idEmotion
-            WHERE g.idUser = 1
-                AND g.idNPC = 1
-                AND g.active = 1
-            LIMIT 1;
-        """)
-        row = cursor.fetchone()
+        with get_cursor() as (_db, cursor):
+            cursor.execute("""
+                SELECT e.emotion
+                FROM emotion_guess_game g
+                JOIN emotion e ON e.idEmotion = g.idEmotion
+                WHERE g.idUser = %s
+                    AND g.idNPC = %s
+                    AND g.active = 1
+                LIMIT 1;
+            """, (idUser, idNPC))
+            row = cursor.fetchone()
         emotion = row[0] if row else "neutral"
         _log(f"[get_cur_emotion] emotion={emotion}")
         sio.emit("send_cur_emotion", emotion)

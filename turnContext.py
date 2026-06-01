@@ -24,4 +24,6 @@ class EmotionGameTurn:
     cancel_stream:      bool = False
     streaming:          bool = False
     audio_ready:        bool = True   # Unreal sets via npc_audio_ready handshake
+    turn_in_progress:   bool = False  # explicit flag — prefer over _lock.locked()
+    word_gen:           int = 0       # bumped each stream to cancel old bg tasks
     _lock:              threading.Lock = field(default_factory=threading.Lock)
