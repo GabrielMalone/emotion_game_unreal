@@ -37,7 +37,8 @@ currentScene = """
         "This feeling…", "What I'm feeling now…", or
         "The way my body feels right now…"
 """
-voiceId = os.environ.get("NPC_VOICE_ID", "XB0fDUnXU5powFXDhCwa")  # Charlotte — natural, expressive, best v3 emotional range
+from elevenlabsQueries import get_default_voice_id
+voiceId = get_default_voice_id()  # single source of truth — see elevenlabsQueries.py
 SERVER  = "http://localhost:5001"
 active_turns = {}  # this will be persistent for the lifetime of the socketio instance
 turn = EmotionGameTurn(

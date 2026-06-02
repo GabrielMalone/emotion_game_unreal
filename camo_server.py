@@ -92,11 +92,12 @@ def _warmup_apis():
 
         # --- ElevenLabs: fire a real TTS call to warm httpx connection pool ---
         try:
-            from elevenlabsQueries import tts
-            gen = tts("hello", "XB0fDUnXU5powFXDhCwa", "neutral")
+            from elevenlabsQueries import tts, get_default_voice_id
+            voice = get_default_voice_id()
+            gen = tts("hello", voice, "neutral")
             for _ in gen:  # consume the stream fully
                 pass
-            log.info("ElevenLabs connection established")
+            log.info(f"ElevenLabs connection established (voice: {voice})")
         except Exception as e:
             log.warning(f"ElevenLabs warmup failed (non-fatal): {e}")
 

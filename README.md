@@ -249,10 +249,20 @@ TiDB Cloud and the game resumes transparently.
 | `/update_NPC_user_mem` | POST | `{idNPC, idUser, kbText}` — update NPC memory |
 | `/get_NPC_user_mem` | POST | `{idNPC, idUser}` — retrieve NPC memory |
 
-## TTS: ElevenLabs v3 + Charlotte
+## TTS: ElevenLabs v3
 
-The NPC voice is **Charlotte** (`XB0fDUnXU5powFXDhCwa`) — chosen for natural,
-emotionally expressive delivery on the eleven_v3 model.
+### Voice configuration
+
+The default NPC voice is **Charlotte** (`XB0fDUnXU5powFXDhCwa`) — chosen for
+natural, emotionally expressive delivery on the eleven_v3 model.
+
+To switch voices, set `NPC_VOICE_ID` in `.env` or change `DEFAULT_VOICE_ID`
+in `elevenlabsQueries.py`. A registry of 8 known voices with notes is in
+`VOICE_REGISTRY` at the top of that file for quick reference.
+
+> **Important:** Charlotte is the only voice that handles stability as low as
+> 0.15 without artifacts. If you switch to Sarah, Amelia, etc., you may need
+> to raise the stability floor in `EMOTION_VOICE_SETTINGS`.
 
 ### Voice settings per emotion
 
@@ -287,6 +297,21 @@ The `_apply_audio_tags()` function wraps NPC dialogue with ElevenLabs v3
   emotions (e.g. `[hesitates]`, `[stammers]`, `[pause]`)
 
 Tags are stripped from the text sent to Unreal for closed-caption display.
+
+### Error handling & retry
+
+TTS calls are wrapped with automatic retry (`_tts_with_retry` in
+`elevenlabsQueries.py`):
+
+- **3 attempts** with exponential backoff: 1s → 2s → 4s (+ random jitter)
+- Catches httpx network errors (timeout, connection reset, read errors)
+- Catches ElevenLabs API errors (429 rate limit, 5xx server errors)
+- Non-retryable errors (4xx auth/bad request) are re-raised immediately
+- On retry, the TTS call restarts from scratch — the audio stream is
+  idempotent and the cache absorbs any duplicate work
+
+Both `tts()` and `tts_with_timestamps()` inherit retry; their cached
+wrappers (`tts_cached`, `tts_with_timestamps_cached`) do too.
 
 ## Key Files
 
@@ -323,7 +348,7 @@ Tags are stripped from the text sent to Unreal for closed-caption display.
 | `DB_SSL_CA` | `isrg-root-x1.pem` | Path to ISRG Root X1 certificate |
 | `OPENAI_API_KEY` | — | OpenAI API key |
 | `ELEVENLABS_API_KEY` | — | ElevenLabs API key |
-| `NPC_VOICE_ID` | `XB0fDUnXU5powFXDhCwa` | ElevenLabs voice ID (Charlotte) |
+| `NPC_VOICE_ID` | `XB0fDUnXU5powFXDhCwa` | ElevenLabs voice ID (see `VOICE_REGISTRY` in `elevenlabsQueries.py`) |
 | `PLAYER_NAME` | `Gabriel` | Default player name |
 | `TTS_LOCAL_PLAYBACK` | `0` | `1` to play audio locally via ffmpeg |
 

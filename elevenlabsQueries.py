@@ -1,4 +1,4 @@
-import os, uuid, random, base64
+import os, uuid, random, base64, time
 import httpx
 from elevenlabs.client import ElevenLabs
 from elevenlabs.types import VoiceSettings
@@ -8,6 +8,33 @@ load_dotenv(".env")
 AUDIO_DIR = "./tts_cache"
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
+# ------------------------------------------------------------------
+# Voice configuration — single source of truth
+# ------------------------------------------------------------------
+# Charlotte: natural, expressive, handles low stability without artifacts.
+# To change the voice, set NPC_VOICE_ID in .env or change DEFAULT_VOICE_ID below.
+DEFAULT_VOICE_ID = "XB0fDUnXU5powFXDhCwa"  # Charlotte
+
+# Registry of known voices with notes (for reference when switching)
+VOICE_REGISTRY = {
+    "XB0fDUnXU5powFXDhCwa": "Charlotte — warm, expressive, great v3 emotional range",
+    "EXAVITQu4vr4xnSDxMaL": "Sarah — soft, American, good for calm/gentle tones",
+    "ZF6FPAbjXT4488VcRRnZ": "Amelia — young, British, enthusiastic",
+    "21m00Tcm4TlvDq8ikWAM": "Rachel — confident, American, natural narration",
+    "AZnzlk1XvdvUeBnXmlld": "Domi — friendly, American, bright",
+    "MF3mGyEYCl7XYWbV9V6O": "Emily — calm, American, meditative",
+    "yoZ06aMxZJJ28mfd3POQ": "Sam — calm, American, thoughtful",
+    "TxGEqnHWrfWFTfGW9XjX": "Josh — deep, American, warm",
+}
+
+def get_default_voice_id() -> str:
+    """Return the configured voice ID from env or the default."""
+    return os.environ.get("NPC_VOICE_ID", DEFAULT_VOICE_ID)
+
+
+# ------------------------------------------------------------------
+# httpx + ElevenLabs client
+# ------------------------------------------------------------------
 http_client = httpx.Client(timeout=240, follow_redirects=True)
 
 _eleven = ElevenLabs(
@@ -15,12 +42,87 @@ _eleven = ElevenLabs(
     httpx_client=http_client,
 )
 
-# Per-emotion VoiceSettings — TUNED FOR eleven_v3 + Charlotte
+
+# ------------------------------------------------------------------
+# TTS retry — wraps generators with exponential backoff
+# ------------------------------------------------------------------
+# Transient errors we retry on: httpx network issues and ElevenLabs
+# API-level 429/5xx.  Non-retryable errors (4xx auth, bad request, etc.)
+# are re-raised immediately.
+TTS_MAX_RETRIES = 3
+TTS_RETRY_BASE_DELAY = 1.0  # seconds, doubles each attempt
+
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+_RETRYABLE_SUBSTRINGS = (
+    "rate limit", "too many requests", "server error",
+    "internal server", "service unavailable", "bad gateway",
+    "gateway timeout",
+)
+
+
+def _is_retryable(error: Exception) -> bool:
+    """Check if an error is transient and worth retrying."""
+    # httpx network-level errors
+    if isinstance(error, (
+        httpx.TimeoutException,
+        httpx.RemoteProtocolError,
+        httpx.ConnectError,
+        httpx.ReadError,
+        httpx.WriteError,
+        httpx.NetworkError,
+    )):
+        return True
+
+    # ElevenLabs SDK errors — check status_code attribute
+    status = getattr(error, "status_code", None)
+    if status is not None and status in _RETRYABLE_STATUS_CODES:
+        return True
+
+    # Fallback: check string representation for known patterns
+    error_str = str(error).lower()
+    return any(pat in error_str for pat in _RETRYABLE_SUBSTRINGS)
+
+
+def _tts_with_retry(generator_factory, *args, **kwargs):
+    """Call generator_factory(*args, **kwargs) and yield its results.
+
+    On transient errors, retry with exponential backoff + jitter.
+    A retry calls the factory again from scratch — the caller receives
+    a fresh stream (audio is idempotent; cache absorbs duplicates).
+    """
+    max_retries = kwargs.pop("_max_retries", TTS_MAX_RETRIES)
+    base_delay = kwargs.pop("_base_delay", TTS_RETRY_BASE_DELAY)
+
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            stream = generator_factory(*args, **kwargs)
+            yield from stream
+            return  # success
+        except Exception as e:
+            last_error = e
+            if not _is_retryable(e):
+                raise
+            if attempt >= max_retries - 1:
+                break
+            delay = base_delay * (2 ** attempt) + random.uniform(0, 0.5)
+            print(
+                f"TTS retry {attempt + 1}/{max_retries} "
+                f"in {delay:.1f}s: {type(e).__name__}: {e}"
+            )
+            time.sleep(delay)
+
+    # All retries exhausted
+    print(f"TTS FAILED after {max_retries} attempts: {type(last_error).__name__}: {last_error}")
+    raise last_error
+
+
+# Per-emotion VoiceSettings — TUNED FOR eleven_v3
 # v3 interprets [bracket tags] natively as performance cues.
 # Lower stability = more emotional range (ElevenLabs docs: 0.20-0.35 is the
 # "creative" sweet spot where audio tags have the most impact).
-# Charlotte (XB0fDUnXU5powFXDhCwa) handles low stability cleanly without
-# artifacts, so we can push emotional range further than Sarah/Amelia.
+# Charlotte (the default) handles low stability cleanly without artifacts.
+# Other voices may need higher stability — test before deploying.
 EMOTION_VOICE_SETTINGS = {
     "happy":     VoiceSettings(stability=0.22, similarity_boost=0.75, style=0.55, speed=1.10),
     "excited":   VoiceSettings(stability=0.18, similarity_boost=0.75, style=0.60, speed=1.20),
@@ -148,15 +250,19 @@ def tts(text, voice_id, emotion):
     tagged_text = _apply_audio_tags(text, emotion)
     print(f"voiceID: {voice_id}  emotion: {emotion}")
     print(f"text: {tagged_text}")
-    audio_stream = _eleven.text_to_speech.convert(
-        voice_id=voice_id,
-        text=tagged_text,
-        model_id="eleven_v3",  # native [bracket tag] support — tags control delivery, not spoken
-        voice_settings=voice_settings,
-    )
-    for chunk in audio_stream:
-        if chunk:
-            yield chunk
+
+    def _call():
+        audio_stream = _eleven.text_to_speech.convert(
+            voice_id=voice_id,
+            text=tagged_text,
+            model_id="eleven_v3",  # native [bracket tag] support — tags control delivery, not spoken
+            voice_settings=voice_settings,
+        )
+        for chunk in audio_stream:
+            if chunk:
+                yield chunk
+
+    yield from _tts_with_retry(_call)
 
 
 # ------------------------------------------------------------------
@@ -172,29 +278,32 @@ def tts_with_timestamps(text, voice_id, emotion):
     tagged_text = _apply_audio_tags(text, emotion)
     print(f"TTS+timestamps: voiceID={voice_id} emotion={emotion}")
 
-    stream = _eleven.text_to_speech.stream_with_timestamps(
-        voice_id=voice_id,
-        text=tagged_text,
-        model_id="eleven_v3",
-        voice_settings=voice_settings,
-    )
+    def _call():
+        accumulated_chars = []
+        accumulated_starts = []
+        accumulated_ends = []
 
-    accumulated_chars = []
-    accumulated_starts = []
-    accumulated_ends = []
+        stream = _eleven.text_to_speech.stream_with_timestamps(
+            voice_id=voice_id,
+            text=tagged_text,
+            model_id="eleven_v3",
+            voice_settings=voice_settings,
+        )
 
-    for chunk in stream:
-        audio_b64 = chunk.audio_base_64
-        audio_bytes = base64.b64decode(audio_b64) if audio_b64 else b""
+        for chunk in stream:
+            audio_b64 = chunk.audio_base_64
+            audio_bytes = base64.b64decode(audio_b64) if audio_b64 else b""
 
-        # Alignment data arrives piecemeal — accumulate
-        align = chunk.alignment
-        if align and align.characters:
-            accumulated_chars.extend(align.characters)
-            accumulated_starts.extend(align.character_start_times_seconds)
-            accumulated_ends.extend(align.character_end_times_seconds)
+            # Alignment data arrives piecemeal — accumulate
+            align = chunk.alignment
+            if align and align.characters:
+                accumulated_chars.extend(align.characters)
+                accumulated_starts.extend(align.character_start_times_seconds)
+                accumulated_ends.extend(align.character_end_times_seconds)
 
-        yield (audio_bytes, accumulated_chars.copy(), accumulated_starts.copy(), accumulated_ends.copy())
+            yield (audio_bytes, accumulated_chars.copy(), accumulated_starts.copy(), accumulated_ends.copy())
+
+    yield from _tts_with_retry(_call)
 
 
 def tts_with_timestamps_cached(text, voice_id, emotion):
