@@ -27,7 +27,7 @@ they're feeling based on body sensations, behavioral cues, and conversation.
    ┌────┴──────┐    ┌────────┴──────┐    ┌────────┴──────┐
    │emotion_game/│    │ OpenAI API  │    │ ElevenLabs TTS │
    │▪ npc_intro  │    │ GPT-4o      │    │ eleven_v3      │
-   │▪ npc_descr  │    │ GPT-4o-mini │    │ (Charlotte)    │
+   │▪ npc_descr  │    │ GPT-4o-mini │    │ (see code)    │
    │▪ player_gss │    └─────────────┘    └───────┬──────┘
    │▪ build_*    │                               │
    └────┬──────┘                        ┌────────┴──────┐
@@ -53,7 +53,7 @@ they're feeling based on body sensations, behavioral cues, and conversation.
 | Backend    | Flask 3 + Flask-SocketIO 5    |
 | LLM        | OpenAI GPT-4o / GPT-4o-mini   |
 | TTS        | ElevenLabs eleven_v3          |
-| Voice      | Charlotte (`XB0fDUnXU5powFXDhCwa`) |
+| Voice      | see `DEFAULT_VOICE_ID` in `elevenlabsQueries.py` |
 | Database   | TiDB Cloud Starter (MySQL-compatible, TLS 1.3) |
 | Client     | Unreal Engine 5 (C++)         |
 
@@ -94,7 +94,7 @@ OPENAI_API_KEY=sk-...
 ELEVENLABS_API_KEY=sk_...
 
 # ── Optional overrides ─────────────────────────────────────
-NPC_VOICE_ID=XB0fDUnXU5powFXDhCwa    # Charlotte — ElevenLabs voice ID
+# NPC_VOICE_ID=<override>               # optional — defaults to DEFAULT_VOICE_ID in code
 PLAYER_NAME=Gabriel                    # Default player name
 TTS_LOCAL_PLAYBACK=0                   # 1 = play audio locally via ffmpeg
 DEBUG_SHORT_RESPONSES=                 # Set to any text to replace ALL NPC output
@@ -253,21 +253,18 @@ TiDB Cloud and the game resumes transparently.
 
 ### Voice configuration
 
-The default NPC voice is **Charlotte** (`XB0fDUnXU5powFXDhCwa`) — chosen for
-natural, emotionally expressive delivery on the eleven_v3 model.
+The NPC voice is set by `DEFAULT_VOICE_ID` in `elevenlabsQueries.py` — that's the
+**single source of truth**. Override it with `NPC_VOICE_ID` in `.env` if needed.
+`VOICE_REGISTRY` lists known voices with notes for quick reference.
 
-To switch voices, set `NPC_VOICE_ID` in `.env` or change `DEFAULT_VOICE_ID`
-in `elevenlabsQueries.py`. A registry of 8 known voices with notes is in
-`VOICE_REGISTRY` at the top of that file for quick reference.
-
-> **Important:** Charlotte is the only voice that handles stability as low as
-> 0.15 without artifacts. If you switch to Sarah, Amelia, etc., you may need
-> to raise the stability floor in `EMOTION_VOICE_SETTINGS`.
+> **Important:** The per-emotion voice settings in `EMOTION_VOICE_SETTINGS` were
+> tuned for a specific voice. If you switch voices, test and adjust stability
+> values — different voices handle low stability differently.
 
 ### Voice settings per emotion
 
 Stability is tuned into the 0.18–0.35 "creative" range where `[bracket tags]`
-have the most impact. Charlotte handles low stability without artifacts.
+have the most impact.
 
 | Emotion   | Stability | Style | Speed |
 |-----------|-----------|-------|-------|
@@ -348,7 +345,7 @@ wrappers (`tts_cached`, `tts_with_timestamps_cached`) do too.
 | `DB_SSL_CA` | `isrg-root-x1.pem` | Path to ISRG Root X1 certificate |
 | `OPENAI_API_KEY` | — | OpenAI API key |
 | `ELEVENLABS_API_KEY` | — | ElevenLabs API key |
-| `NPC_VOICE_ID` | `XB0fDUnXU5powFXDhCwa` | ElevenLabs voice ID (see `VOICE_REGISTRY` in `elevenlabsQueries.py`) |
+| `NPC_VOICE_ID` | `DEFAULT_VOICE_ID` in `elevenlabsQueries.py` | optional .env override |
 | `PLAYER_NAME` | `Gabriel` | Default player name |
 | `TTS_LOCAL_PLAYBACK` | `0` | `1` to play audio locally via ffmpeg |
 

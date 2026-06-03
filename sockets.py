@@ -32,6 +32,7 @@ from flask_socketio import SocketIO, join_room
 from UnrealPhase1 import active_turns, start_game, advance_game, currentScene, idUser, idNPC, voiceId
 from emotionGameQueries import get_active_emotion, get_num_correct
 from db import get_cursor
+from input_filter import sanitize_player_input
 
 sio = SocketIO(cors_allowed_origins="*")
 
@@ -94,12 +95,22 @@ def init_socket_events(app):
         if turn.turn_in_progress:
             _log("[player_input] ignored — turn in progress")
             return
+
+        # --- input filtering: non-speech + profanity ---
+        raw_text = data.get("player_text", "")
+        player_text, was_ignored, had_profanity = sanitize_player_input(raw_text)
+        if was_ignored:
+            _log(f"[player_input] IGNORED non-speech: {raw_text[:100]!r}")
+            return
+        if had_profanity:
+            _log(f"[player_input] PROFANITY censored: {raw_text[:100]!r} → {player_text!r}")
+
         # Only cancel if a stream is actually in progress, otherwise
         # we kill _emit_words background tasks from a stream that
         # already finished naturally (breaks lip sync).
         if turn.streaming:
             turn.cancel_stream = True
-        advance_game(turn, data.get("player_text", ""), data.get("last_npc_text", ""), sio=sio)
+        advance_game(turn, player_text, data.get("last_npc_text", ""), sio=sio)
 
     @sio.on("unreal_audio_is_streaming")
     def on_audio_streaming_start(data=None):
@@ -129,9 +140,16 @@ def init_socket_events(app):
             return
         turn.cancel_stream = True
         if data and data.get("player_text", "").strip():
+            raw_text = data.get("player_text", "")
+            player_text, was_ignored, had_profanity = sanitize_player_input(raw_text)
+            if was_ignored:
+                _log(f"[player_stepped_away] IGNORED non-speech: {raw_text[:100]!r}")
+                return
+            if had_profanity:
+                _log(f"[player_stepped_away] PROFANITY censored: {raw_text[:100]!r} → {player_text!r}")
             advance_game(
                 turn,
-                data.get("player_text", ""),
+                player_text,
                 data.get("last_npc_text", ""),
                 sio=sio,
             )
