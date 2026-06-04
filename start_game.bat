@@ -107,11 +107,26 @@ del "%MYSQL_ERR%" 2>nul
 echo   Database reset complete.
 
 :: ------------------------------------------------------------------
-:: 3. Start camo_server.py using the egvenv Python directly
+:: 3. Prompt for player name (Enter = default "gabriel")
+:: ------------------------------------------------------------------
+echo.
+echo =================================================================
+echo   Player name (press Enter for default 'gabriel'):
+echo =================================================================
+set /p PLAYER_NAME_INPUT="  > "
+if "%PLAYER_NAME_INPUT%"=="" (
+    set "PLAYER_NAME=gabriel"
+) else (
+    set "PLAYER_NAME=%PLAYER_NAME_INPUT%"
+)
+echo   Player: %PLAYER_NAME%
+
+:: ------------------------------------------------------------------
+:: 4. Start camo_server.py using the egvenv Python directly
 :: ------------------------------------------------------------------
 echo.
 echo ================================================================
-echo   Starting camo_server.py on http://0.0.0.0:5001
+echo   Starting camo_server.py on http://0.0.0.0:5001 (Player: %PLAYER_NAME%)
 echo ================================================================
 echo.
 
