@@ -103,7 +103,8 @@ def init_socket_events(app):
             _log(f"[player_input] IGNORED non-speech: {raw_text[:100]!r}")
             return
         if had_profanity:
-            _log(f"[player_input] PROFANITY censored: {raw_text[:100]!r} → {player_text!r}")
+            _log(f"[player_input] PROFANITY dropped: {raw_text[:100]!r}")
+            return
 
         # Only cancel if a stream is actually in progress, otherwise
         # we kill _emit_words background tasks from a stream that
@@ -146,7 +147,8 @@ def init_socket_events(app):
                 _log(f"[player_stepped_away] IGNORED non-speech: {raw_text[:100]!r}")
                 return
             if had_profanity:
-                _log(f"[player_stepped_away] PROFANITY censored: {raw_text[:100]!r} → {player_text!r}")
+                _log(f"[player_stepped_away] PROFANITY dropped: {raw_text[:100]!r}")
+                return
             advance_game(
                 turn,
                 player_text,
