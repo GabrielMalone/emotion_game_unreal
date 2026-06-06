@@ -12,6 +12,10 @@ def npc_introduce(turn: EmotionGameTurn, sio):
 
     # start out worried for this scenario
     turn.cur_npc_emotion = "worried"
+    # cache NPC persona once if not already set (belt-and-suspenders)
+    if turn._npc_data is None:
+        from emotion_game.npc_data import get_npc
+        turn._npc_data = get_npc(turn.idNPC)
     # intro prompt for emotional eq game
     turn.prompt = build_intro_prompt(turn)
     # stream response from openAI

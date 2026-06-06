@@ -1,6 +1,6 @@
 # emotionGame — Architecture Overview
 
-> **Updated**: 2025-07-15  
+> **Updated**: 2025-07-19  
 > **Purpose**: Quick mental model for anyone working on this codebase (including future you).
 
 ---
@@ -32,7 +32,7 @@ lip-sync timing.
 | `sockets.py` | All SocketIO event handlers. `connect`, `register_user`, `player_input`, `player_stepped_away`, `get_cur_emotion`, audio gate events (`unreal_audio_is_streaming` / `unreal_audio_done_streaming`). All events logged to `socket_debug.log`. Calls `UnrealPhase1.start_game` / `advance_game`. |
 | `UnrealPhase1.py` | **Game state machine**. Singleton `turn` object. Functions: `start_game()`, `advance_game()`, `assignEmotion()`. Game phases: intro → agree_check → assign_emotion → describe → guess → (correct/incorrect) → repeat. |
 | `turnContext.py` | `EmotionGameTurn` dataclass — holds all per-turn state: `idNPC`, `idUser`, `player_name`, `current_scene`, `voiceId`, `cur_npc_emotion`, `emotion_guessed`, `prompt`, `turn_index`, `game_started`, `game_over`, `guessing_started`, `npc_memory`, `player_text`, `last_npc_text`, `cues`, `cancel_stream`, `streaming`, `audio_ready`, `turn_in_progress`, `word_gen`, `_lock`. |
-| `input_filter.py` | Sanitizes speech-to-text input from Unreal. Filters: (1) non-speech artifacts (`[keyboard clicking]`, `[music]`, filler sounds), (2) profanity (censors with asterisks). Returns `(cleaned_text, was_ignored, had_profanity)`. |
+| `input_filter.py` | Sanitizes speech-to-text input from Unreal. Filters: (1) non-speech artifacts (`[keyboard clicking]`, `[music]`, filler sounds) → `was_ignored=True`, (2) profanity → `had_profanity=True` with censored text. `sockets.py` silently drops both (never reaches `advance_game`). Returns `(cleaned_text, was_ignored, had_profanity)`. |
 
 ### LLM layer (OpenAI)
 
@@ -210,9 +210,9 @@ CONNECT → register_user → start_game()
 
 5. **TTS retry with backoff**: Network hiccups, 429s, and 5xx from ElevenLabs are retried 3x with exponential backoff + jitter.
 
-6. **Input sanitization**: All player text from Unreal STT passes through `input_filter.py` — non-speech artifacts are dropped, profanity is censored.
+6. **Input sanitization**: All player text from Unreal STT passes through `input_filter.py` → `sockets.py` drops both non-speech artifacts and profanity silently (NPC never sees them).
 
-7. **Player name flow**: `start_game.sh` prompts → `PLAYER_NAME` env var → `UnrealPhase1.start_game()` default. Unreal can override via `register_user({player_name: ...})`.
+7. **Player name flow**: `start_game.sh` / `start_game.bat` prompt for player name → `PLAYER_NAME` env var → `UnrealPhase1.start_game()` default. Unreal can override via `register_user({player_name: ...})`.
 
 8. **Debug mode**: Set `DEBUG_SHORT_RESPONSES=Hello.` in `.env` → all NPC output replaced with that text. Also switches DB to localhost.
 

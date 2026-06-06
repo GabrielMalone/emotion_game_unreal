@@ -197,16 +197,27 @@ _CUE_FALLBACK = [
 
 
 def prewarm_cue_cache(client) -> None:
-    """Generate and cache cues for all 8 emotions at startup."""
+    """Generate and cache cues for all 8 emotions at startup.
+
+    Parallelizes the 8 independent gpt-4o-mini calls via ThreadPoolExecutor
+    so startup drops from ~12s sequential to ~2s (single slowest call).
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
     emotions = ["happy", "sad", "angry", "afraid", "surprised",
                 "calm", "excited", "disgusted"]
-    for emotion in emotions:
+
+    def _gen_one(emotion: str) -> None:
         try:
             _CUE_CACHE[emotion] = generate_emotion_cues(emotion, client)
             print(f"[cue-cache] pre-generated cues for '{emotion}'")
         except Exception as e:
             print(f"[cue-cache] failed for '{emotion}': {e}")
             _CUE_CACHE[emotion] = list(_CUE_FALLBACK)
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(_gen_one, emotions))
+
     print("[cue-cache] warmup complete")
 
 

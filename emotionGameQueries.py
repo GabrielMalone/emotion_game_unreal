@@ -61,7 +61,14 @@ def get_num_correct(t: EmotionGameTurn) -> dict | None:
 
 # ------------------------------------------------------------------
 def assign_next_emotion(t: EmotionGameTurn):
-    with get_cursor(dictionary=True) as (db, cursor):
+    """Assign the next unused emotion atomically.
+
+    The three statements (deactivate old, find next, insert new) must
+    be transactional so a crash between steps doesn't leave the game
+    with no active emotion.
+    """
+    from db import transactional
+    with transactional(dictionary=True) as (db, cursor):
 
         # 1. Deactivate any currently active emotion (safety)
         cursor.execute("""

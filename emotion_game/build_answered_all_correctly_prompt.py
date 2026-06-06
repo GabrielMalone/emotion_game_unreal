@@ -4,7 +4,7 @@ from emotion_game.npc_data import get_npc
 
 def build_end_round_prompt(t: EmotionGameTurn) -> str:
 
-    npc = get_npc(t.idNPC)
+    npc = getattr(t, '_npc_data', None) or get_npc(t.idNPC)
 
     prompt = f"""
         You are an NPC in an emotional intelligence game.

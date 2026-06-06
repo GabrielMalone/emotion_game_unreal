@@ -27,3 +27,4 @@ class EmotionGameTurn:
     turn_in_progress:   bool = False  # explicit flag — prefer over _lock.locked()
     word_gen:           int = 0       # bumped each stream to cancel old bg tasks
     _lock:              threading.Lock = field(default_factory=threading.Lock)
+    _npc_data:          dict | None = None  # cached NPC persona (set once at game start)

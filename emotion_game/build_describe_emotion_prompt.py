@@ -12,7 +12,7 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
 
     print(f"\nPROMPT DEBUG. cues == {t.cues}")
 
-    npc = get_npc(t.idNPC)
+    npc = getattr(t, '_npc_data', None) or get_npc(t.idNPC)
 
     prompt = f"""
         You are an NPC in an emotional intelligence game.

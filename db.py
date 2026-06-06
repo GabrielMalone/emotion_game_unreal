@@ -96,19 +96,19 @@ def get_cursor(dictionary: bool = False):
 
 
 @contextmanager
-def transactional():
+def transactional(dictionary: bool = False):
     """
     Context manager for multi-statement transactions.
     Commits on success, rolls back on error, always closes.
 
     Usage:
-        with transactional() as (conn, cur):
+        with transactional(dictionary=True) as (conn, cur):
             cur.execute(...)
             cur.execute(...)
     """
     conn = connect()
     try:
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=dictionary)
         yield conn, cursor
         conn.commit()
     except mysql.connector.Error:

@@ -90,6 +90,11 @@ def start_game(sio, player_name: str = None):
 
 def _start_game_impl(sio):
 
+    # --- Cache NPC persona once so the 5 prompt builders don't each
+    #     hit TiDB Cloud for the same row. ---
+    from emotion_game.npc_data import get_npc
+    turn._npc_data = get_npc(turn.idNPC)
+
     # the following two conditions are if the game has started
     # and the player walked away and came back
     with get_cursor(dictionary=True) as (db, cursor):
