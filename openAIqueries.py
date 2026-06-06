@@ -144,23 +144,26 @@ def generate_emotion_cues(emotion: str, client) -> list[str] | None:
     print(f"DEBUGGING EMOTION SETTING {emotion}")
 
     system = (
-        "You generate short,descriptions of emotions.\n"
+        "You generate short descriptions of emotions for young children (ages 4-7).\n"
         "Rules:\n"
-        "- Use concrete body sensations or everyday situations\n"
-        "- No abstract psychology words\n"
+        "- Use concrete body sensations or everyday situations a young child knows\n"
+        "- Use very simple words (kindergarten level)\n"
+        "- No abstract or psychology words\n"
         "- Do NOT name the emotion\n"
         "- Return ONLY valid JSON\n"
     )
 
     user = f"""
-        Generate 3 different clues for this emotion:
+        Generate 3 different clues for this feeling:
 
-        Emotion: {emotion}
+        Feeling: {emotion}
 
-        Each clue must be:
+        Each clue must be something a 4-7 year old child can understand, like:
         1) A body feeling OR
-        2) A familiar kid experience OR
-        3) A visible behavior
+        2) Something that happens in everyday kid life OR
+        3) Something you can see someone do
+
+        Use very simple words. Short sentences.
 
         Return JSON only in exactly this shape:
         {{"cues":["...","...","..."]}}
