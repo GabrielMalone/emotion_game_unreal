@@ -1,6 +1,6 @@
 # emotionGame — Architecture Overview
 
-> **Updated**: 2025-07-19  
+> **Updated**: 2026-06-06  
 > **Purpose**: Quick mental model for anyone working on this codebase (including future you).
 
 ---
@@ -10,6 +10,8 @@
 A Flask + SocketIO backend for an Unreal Engine 5 emotional intelligence game.
 An NPC has lost the ability to name emotions — the player helps by guessing what
 the NPC is feeling based on body sensations, behavioral cues, and conversation.
+Target audience: children ages 4–7. All NPC dialogue is GPT-4o generated with
+simplified vocabulary and short sentences appropriate for young players.
 8 emotions, streaming GPT-4o dialogue + ElevenLabs text-to-speech with word-level
 lip-sync timing.
 
@@ -29,17 +31,18 @@ lip-sync timing.
 
 | File | Role |
 |---|---|
-| `sockets.py` | All SocketIO event handlers. `connect`, `register_user`, `player_input`, `player_stepped_away`, `get_cur_emotion`, audio gate events (`unreal_audio_is_streaming` / `unreal_audio_done_streaming`). All events logged to `socket_debug.log`. Calls `UnrealPhase1.start_game` / `advance_game`. |
+| `sockets.py` | All SocketIO event handlers. `connect`, `register_user`, `player_input`, `player_stepped_away`, `get_cur_emotion`, audio gate events (`unreal_audio_is_streaming` / `unreal_audio_done_streaming`). All events logged via standard `logging` → stderr + `server.log`. Calls `UnrealPhase1.start_game` / `advance_game`. |
 | `UnrealPhase1.py` | **Game state machine**. Singleton `turn` object. Functions: `start_game()`, `advance_game()`, `assignEmotion()`. Game phases: intro → agree_check → assign_emotion → describe → guess → (correct/incorrect) → repeat. |
-| `turnContext.py` | `EmotionGameTurn` dataclass — holds all per-turn state: `idNPC`, `idUser`, `player_name`, `current_scene`, `voiceId`, `cur_npc_emotion`, `emotion_guessed`, `prompt`, `turn_index`, `game_started`, `game_over`, `guessing_started`, `npc_memory`, `player_text`, `last_npc_text`, `cues`, `cancel_stream`, `streaming`, `audio_ready`, `turn_in_progress`, `word_gen`, `_lock`. |
-| `input_filter.py` | Sanitizes speech-to-text input from Unreal. Filters: (1) non-speech artifacts (`[keyboard clicking]`, `[music]`, filler sounds) → `was_ignored=True`, (2) profanity → `had_profanity=True` with censored text. `sockets.py` silently drops both (never reaches `advance_game`). Returns `(cleaned_text, was_ignored, had_profanity)`. |
+| `turnContext.py` | `EmotionGameTurn` dataclass — holds all per-turn state: `idNPC`, `idUser`, `player_name`, `current_scene`, `voiceId`, `cur_npc_emotion`, `emotion_guessed`, `prompt`, `turn_index`, `game_started`, `game_over`, `guessing_started`, `npc_memory`, `player_text`, `last_npc_text`, `cues`, `cancel_stream`, `streaming`, `audio_ready`, `turn_in_progress`, `word_gen`, `_lock`, `_npc_data` (cached NPC persona dict, populated at game start, eliminates redundant DB queries). |
+| `input_filter.py` | Sanitizes speech-to-text input from Unreal. Filters: (1) non-speech artifacts (`[keyboard clicking]`, `[music]`, filler sounds) → `was_ignored=True`, (2) profanity → `had_profanity=True`. `sockets.py` drops both immediately (returns before `advance_game`). Profanity is dropped entirely — NPC never sees it, not even censored. Returns `(cleaned_text, was_ignored, had_profanity)`. |
+| `api_logger.py` | Lightweight `api_log` logger for all API errors. Streams to stderr (WARNING+) and propagates to root → `server.log`. No separate file. Wired into all OpenAI and ElevenLabs call sites. |
 
 ### LLM layer (OpenAI)
 
 | File | Role |
 |---|---|
 | `llm_client.py` | Creates `OpenAI` client from env var `OPENAI_API_KEY`. |
-| `openAIqueries.py` | All GPT calls: `getResponseStream()` (GPT-4o streaming), `classify_player_response_to_game_start()` (yes/no agreement), `classify_emotion_guess()` (maps text→emotion), `generate_emotion_cues()` (GPT-4o-mini, 3 body-sensation clues), `get_cues_for_emotion()` (with pre-warmed cache), `prewarm_cue_cache()` (generates all 8 at startup). Also `parse_llm_json()` — robust JSON extraction from LLM output. |
+| `openAIqueries.py` | All GPT calls: `getResponseStream()` (GPT-4o streaming), `classify_player_response_to_game_start()` (yes/no agreement), `classify_emotion_guess()` (maps text→emotion), `generate_emotion_cues()` (GPT-4o-mini, 3 body-sensation clues), `get_cues_for_emotion()` (with pre-warmed cache), `prewarm_cue_cache()` (ThreadPoolExecutor, max_workers=8 — 8 parallel GPT-4o-mini calls, ~12s → ~2s cold start). Also `parse_llm_json()` — robust JSON extraction from LLM output. |
 
 ### TTS layer (ElevenLabs)
 
@@ -47,13 +50,14 @@ lip-sync timing.
 |---|---|
 | `elevenlabsQueries.py` | **~300 lines**. Voice config (`DEFAULT_VOICE_ID`, `VOICE_REGISTRY`), per-emotion `VoiceSettings` (stability 0.15–0.35), `EMOTION_TAGS`/`_REACTION_TAGS`/`_PACING_TAGS` for v3 bracket-tag delivery, `_apply_audio_tags()`, `tts()` (with retry), `tts_with_timestamps()` (character alignment for lip sync), `tts_cached()` (sha256 in `tts_cache/`), `saveAudio()`, `_tts_with_retry()` (exponential backoff + jitter). |
 | `design_voice.py` | One-shot script: design custom ElevenLabs voice via Voice Design v3. Generates 3 previews, saves mp3s to `voice_previews/`, lets you pick one. |
+| `voice_previews/` | Directory with pre-generated sample voice preview mp3s (4 NPC voices). `_last_ids.json` tracks the generated voice IDs. |
 
 ### Database layer (TiDB Cloud MySQL)
 
 | File | Role |
 |---|---|
 | `db.py` | MySQL connection pool (`MySQLConnectionPool`, pool_size=5). Context managers: `get_cursor()` (auto-close), `transactional()` (commit/rollback). Reads `.env` for credentials + SSL (`isrg-root-x1.pem`). |
-| `emotionGameQueries.py` | Game-specific DB queries: `mark_emotion_guessed_correct()`, `get_remaining_emotions()`, `get_active_emotion()`, `get_num_correct()`, `assign_next_emotion()`. |
+| `emotionGameQueries.py` | Game-specific DB queries: `mark_emotion_guessed_correct()`, `get_remaining_emotions()`, `get_active_emotion()`, `get_num_correct()`, `assign_next_emotion()` (transactional — deactivate old + insert new in one atomic operation, prevents orphaned state on crash). |
 | `phase_2_queries.py` | `update_NPC_user_memory_query()` and `get_NPC_user_memory_query()` — NPC knowledge base persistence. |
 | `database/camodb_phase1.sql` | Full schema: NPC, user, storylet, emotion, emotion_guess_game, npc_user_memory, tasks, items, relationships, etc. |
 
@@ -154,7 +158,6 @@ Two layers prevent overlapping input:
 | `NPC_VOICE_ID` | — | code default | Override voice |
 | `DEBUG_SHORT_RESPONSES` | — | — | Replace all NPC output with fixed text |
 | `DB_DEBUG_PASSWORD` | — | — | Local MySQL password (debug mode) |
-| `SOCKET_DEBUG_LOG` | — | `socket_debug.log` | Socket event log path |
 | `FLASK_DEBUG` | — | — | Enable Flask debug mode |
 | `HOST` | — | `0.0.0.0` | Bind address |
 | `PORT` | — | `5001` | Bind port |
@@ -204,17 +207,25 @@ CONNECT → register_user → start_game()
 
 2. **Word-level lip sync**: ElevenLabs character alignment → server calculates timing → `show_word` events fire at the right moment via `sio.start_background_task()`. No `GetPlaybackTime()` needed on Unreal side.
 
-3. **Cue pre-warming**: `prewarm_cue_cache()` generates all 8 emotion cues at startup (GPT-4o-mini) so the first turn doesn't have a 3–5s cold-start delay. Fallback cues if generation fails.
+3. **Cue pre-warming**: `prewarm_cue_cache()` generates all 8 emotion cues at startup via `ThreadPoolExecutor(max_workers=8)` — 8 parallel GPT-4o-mini calls. Cold start dropped from ~12s to ~2s. Fallback cues if any generation call fails.
 
 4. **TTS caching**: `tts_cache/` stores mp3s keyed by `sha256(voice_id | emotion | text)`. Same text+emotion → instant cache hit.
 
 5. **TTS retry with backoff**: Network hiccups, 429s, and 5xx from ElevenLabs are retried 3x with exponential backoff + jitter.
 
-6. **Input sanitization**: All player text from Unreal STT passes through `input_filter.py` → `sockets.py` drops both non-speech artifacts and profanity silently (NPC never sees them).
+6. **Unified logging (`server.log`)**: All components (Flask, SocketIO, OpenAI, ElevenLabs, socket events, tracebacks) log to a single rotating file: `server.log` (10 MB × 3 backups). `camo_server.py` configures the root logger with both a `StreamHandler` (stderr, INFO+) and a `RotatingFileHandler` (server.log, DEBUG). `api_logger.py` is a lightweight child logger that propagates API errors to root — no separate file. `sockets.py` uses standard `logging` instead of a custom debug file. Everything lands in one place, viewable with `tail -f server.log`. This replaced a fragmented system of 3 separate log files (`server.log`, `api_errors.log`, `socket_debug.log`) that made debugging confusing.
 
-7. **Player name flow**: `start_game.sh` / `start_game.bat` prompt for player name → `PLAYER_NAME` env var → `UnrealPhase1.start_game()` default. Unreal can override via `register_user({player_name: ...})`.
+7. **Input sanitization**: All player text from Unreal STT passes through `input_filter.py` → `sockets.py` drops both non-speech artifacts and profanity immediately (returns before `advance_game`, NPC never sees either). Profanity is dropped entirely — not censored and forwarded.
 
-8. **Debug mode**: Set `DEBUG_SHORT_RESPONSES=Hello.` in `.env` → all NPC output replaced with that text. Also switches DB to localhost.
+8. **NPC data caching**: `turnContext.EmotionGameTurn._npc_data` caches the NPC persona dict at game start. 6 prompt builders now use `t._npc_data` or `get_npc(t.idNPC)` (also cached) instead of querying TiDB Cloud every time. Eliminates 4–5 redundant DB queries per turn (~250–500ms savings).
+
+9. **Transactional emotion assignment**: `emotionGameQueries.assign_next_emotion()` runs inside `transactional(dictionary=True)` — deactivates the old emotion and inserts the new one atomically. Fixes a bug where a crash between the deactivate and insert would leave the game with no active emotion.
+
+10. **Simplified prompts for young audience**: All 7 prompt builders include a `TARGET AUDIENCE` block specifying children ages 4–7. Response lengths are shorter (2–4 sentences vs paragraphs), vocabulary is simplified (no "dilemma", "internal state", "emotional containment"), and cue generation uses child-friendly language. This ensures GPT-4o produces age-appropriate dialogue the target players can understand.
+
+11. **Player name flow**: `start_game.sh` / `start_game.bat` prompt for player name → `PLAYER_NAME` env var → `UnrealPhase1.start_game()` default. Unreal can override via `register_user({player_name: ...})`.
+
+12. **Debug mode**: Set `DEBUG_SHORT_RESPONSES=Hello.` in `.env` → all NPC output replaced with that text. Also switches DB to localhost.
 
 ---
 
