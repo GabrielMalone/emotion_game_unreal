@@ -4,6 +4,10 @@ A Flask + SocketIO backend for an Unreal Engine 5 emotional intelligence game.
 An NPC has lost the ability to name emotions — the player helps by guessing what
 they're feeling based on body sensations, behavioral cues, and conversation.
 
+**Target audience: children ages 4–7.** All NPC dialogue uses simplified
+vocabulary and short sentences (2–4 sentences max). Prompt builders include a
+`TARGET AUDIENCE` block so GPT-4o produces age-appropriate responses.
+
 ## Architecture
 
 ```
@@ -70,9 +74,9 @@ they're feeling based on body sensations, behavioral cues, and conversation.
 
 ```bash
 cd emotion_game_unreal
-python -m venv egvenv
-source egvenv/bin/activate       # macOS/Linux
-# egvenv\Scripts\activate       # Windows
+python -m venv venv
+source venv/bin/activate         # macOS/Linux
+# venv\Scripts\activate          # Windows
 pip install -r requirements.txt
 ```
 
@@ -97,6 +101,7 @@ ELEVENLABS_API_KEY=sk_...
 # NPC_VOICE_ID=<override>               # optional — defaults to DEFAULT_VOICE_ID in code
 PLAYER_NAME=Gabriel                    # Default player name
 TTS_LOCAL_PLAYBACK=0                   # 1 = play audio locally via ffmpeg
+API_ERROR_LOG=api_errors.log           # API error log path (default: api_errors.log)
 DEBUG_SHORT_RESPONSES=                 # Set to any text to replace ALL NPC output
                                        #   e.g. "Hello." → NPC always says "Hello."
                                        #   Leave empty for normal AI responses
@@ -218,6 +223,9 @@ TiDB Cloud and the game resumes transparently.
 | `register_user` | `{player_name?}` | Join room, start game with player name |
 | `player_input` | `{player_text, last_npc_text}` | Player sends text (guess, answer, or chat) |
 | `player_stepped_away` | `{player_text?, last_npc_text?}` | Player left and returned |
+| `unreal_audio_is_streaming` | — | Unreal starts playing audio — blocks input |
+| `unreal_audio_done_streaming` | — | Unreal finished playing audio — allows input |
+| `npc_audio_ready` | — | Unreal audio reset complete |
 | `get_cur_emotion` | — | Debug: query current active emotion |
 | `disconnect` | — | Sets `cancel_stream` flag, stops TTS |
 
@@ -256,6 +264,10 @@ TiDB Cloud and the game resumes transparently.
 The NPC voice is set by `DEFAULT_VOICE_ID` in `elevenlabsQueries.py` — that's the
 **single source of truth**. Override it with `NPC_VOICE_ID` in `.env` if needed.
 `VOICE_REGISTRY` lists known voices with notes for quick reference.
+
+Pre-generated sample voice previews live in `voice_previews/` (4 NPC voices with
+different tones). Run `python design_voice.py` to design a new voice via
+ElevenLabs Voice Design v3.
 
 > **Important:** The per-emotion voice settings in `EMOTION_VOICE_SETTINGS` were
 > tuned for a specific voice. If you switch voices, test and adjust stability
@@ -321,17 +333,22 @@ wrappers (`tts_cached`, `tts_with_timestamps_cached`) do too.
 | `db.py` | TiDB Cloud connection pool (5), `get_cursor` and `transactional` context managers, TLS 1.3 with certificate verification |
 | `llm_client.py` | OpenAI client init |
 | `openAIqueries.py` | LLM: streaming (`GPT-4o`), classification + cue gen (`GPT-4o-mini`) |
-| `emotionGameQueries.py` | DB: assign/mark emotions, get active, count correct |
+| `emotionGameQueries.py` | DB: assign/mark emotions (transactional), get active, count correct |
 | `phase_2_queries.py` | DB: storylets, storylet choices, tasks, inventory, NPC relationships |
 | `elevenlabsQueries.py` | ElevenLabs TTS + caching, per-emotion voice settings, audio tag injection |
+| `input_filter.py` | Sanitizes STT input: drops non-speech artifacts and profanity |
+| `api_logger.py` | Shared logger for API errors → `api_errors.log` + stderr |
+| `design_voice.py` | Design custom ElevenLabs voice via Voice Design v3 |
+| `voice_previews/` | Pre-generated sample voice preview mp3s (4 NPC voices) |
 | `streamNPCresponse/streamTextResponse.py` | Sentence-by-sentence text + TTS streaming to Unreal |
 | `streamingMP3Player.py` | ffmpeg-based local MP3 playback (`TTS_LOCAL_PLAYBACK=1`) |
 | `voiceRecorder.py` | Microphone recorder (SoundDevice) |
-| `emotion_game/` | 10 modules: NPC intro, describe, guess, 6 prompt builders, NPC memory |
+| `emotion_game/` | 10 modules: NPC intro, describe, guess, 6 prompt builders (simplified for ages 4–7), NPC memory |
 | `tests/` | pytest suite (31 tests: turnContext, openAIqueries, db) |
 | `database/camodb_phase1.sql` | Full MySQL-compatible schema + seed data |
 | `isrg-root-x1.pem` | ISRG Root X1 certificate for TiDB Cloud TLS connections |
-| `start_game.bat` | Windows startup: DB reset + server launch with SSL |
+| `start_game.sh` | macOS/Linux startup: DB reset + server launch with SSL |
+| `start_game.bat` | Windows startup: DB reset + player name prompt + server launch with SSL |
 
 ## Environment Variables
 
@@ -348,6 +365,7 @@ wrappers (`tts_cached`, `tts_with_timestamps_cached`) do too.
 | `NPC_VOICE_ID` | `DEFAULT_VOICE_ID` in `elevenlabsQueries.py` | optional .env override |
 | `PLAYER_NAME` | `Gabriel` | Default player name |
 | `TTS_LOCAL_PLAYBACK` | `0` | `1` to play audio locally via ffmpeg |
+| `API_ERROR_LOG` | `api_errors.log` | API error log path |
 
 ## Testing
 
@@ -363,6 +381,26 @@ pytest tests/ -v
 `sockets.py` calls `start_game()` immediately on `connect` — the player doesn't
 need to send `register_user` first. This reduces latency for Unreal clients that
 connect at launch and expect the NPC to begin speaking.
+
+### Target audience: children ages 4–7
+
+All prompt builders include a `TARGET AUDIENCE` block instructing GPT-4o to
+produce dialogue for 4–7 year olds. Response lengths are capped at 2–4 short
+sentences, vocabulary is simplified (no "dilemma", "internal state", "emotional
+containment"), and cue generation uses child-friendly descriptors.
+
+### API error logging
+
+All OpenAI and ElevenLabs failures (retries and terminal errors) are logged to
+`api_errors.log` via `api_logger.py`. Console stderr also receives WARNING+
+entries so developers can see failures live. Added after a playthrough error
+went undiagnosed for 5 days because it only printed to terminal.
+
+### Input sanitization
+
+Player STT input passes through `input_filter.py` before reaching game logic.
+Non-speech artifacts (`[keyboard clicking]`, `[music]`, filler sounds) and
+profanity are silently dropped — the NPC never sees them.
 
 ### Thread-safe turns
 

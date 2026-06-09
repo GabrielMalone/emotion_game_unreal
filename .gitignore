@@ -23,7 +23,12 @@ Thumbs.db
 tts_cache/
 .mini_agent_backups/
 .mini_agent_memory.db
+.mini_agent_memory.db-shm
+.mini_agent_memory.db-wal
+.mini_agent_memory_session_sunshine.db
 .mini_agent_index.json
+.mini_agent.rules
+.mini_agent.toml
 .pytest_cache/
 reports/
 
@@ -31,7 +36,10 @@ reports/
 *.mp3
 *.wav
 
+# Apple resource forks
+._*
+
 # Logs
 *.log
-server_log.txt
+server.log
 socket_debug.log
