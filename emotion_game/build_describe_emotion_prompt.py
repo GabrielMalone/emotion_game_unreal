@@ -107,7 +107,9 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
     ------------
     - A new, different feeling has come since {t.player_name} last helped you.
     - You MUST say that a new, different feeling is here.
-    - Like: "Now I feel something new. It is different."
+    - Never say "It is different" as its own sentence. Attach it naturally.
+      Right: "Now I feel something new, it's different."
+      Wrong: "Now I feel something new. It is different."
     - Keep it to one short sentence.
 
     - Move naturally into talking about the new feeling.

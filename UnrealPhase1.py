@@ -98,19 +98,27 @@ def _start_game_impl(sio):
 
     # the following two conditions are if the game has started
     # and the player walked away and came back
+    # --- Clear stale player_text from previous session so it isn't
+    #     replayed as a guess on reconnect. ---
+    turn.player_text = ""
+
     with get_cursor(dictionary=True) as (db, cursor):
         cursor.execute("""
             SELECT
             CASE
-                WHEN COUNT(*) > 0
-                AND COUNT(*) = SUM(guessed_correctly = 1)
+                WHEN (SELECT COUNT(*) FROM emotion
+                      WHERE emotion.idEmotion IN (
+                          SELECT idEmotion FROM emotion_guess_game
+                          WHERE idUser = %s AND idNPC = %s))
+                     > 0
+                AND (SELECT COUNT(*) FROM emotion_guess_game
+                    WHERE idUser = %s AND idNPC = %s
+                      AND guessed_correctly = 1)
+                    = (SELECT COUNT(*) FROM emotion)
                 THEN 1
                 ELSE 0
-            END AS all_emotions_guessed_correctly
-            FROM emotion_guess_game
-            WHERE idUser = %s
-            AND idNPC = %s;
-        """, (turn.idUser, turn.idNPC))
+            END AS all_emotions_guessed_correctly;
+        """, (turn.idUser, turn.idNPC, turn.idUser, turn.idNPC))
         gameOver = cursor.fetchone()
 
     if gameOver["all_emotions_guessed_correctly"] == 1:
@@ -173,8 +181,20 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
             pass
 
         # reset share state before moving on
+        prev_emotion = turn.last_correct_emotion
         turn.waiting_for_share = False
         turn.last_correct_emotion = ""
+
+        # --- boundary note: prevent LLM from contaminating the next
+        #     emotion with cues / descriptions from the previous one ---
+        turn.npc_memory = (
+            f"[NOTE: You resolved the {prev_emotion} feeling. "
+            f"A brand new, different feeling is here now. "
+            f"Do NOT mention, describe, or reference {prev_emotion} at all. "
+            f"Focus completely on what you are feeling right now.] "
+            f"{turn.npc_memory}"
+        )
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
 
         # now assign the next emotion
         assignEmotion(turn, sio)

@@ -20,10 +20,13 @@ fi
 
 # Parse .env safely — handles spaces and special chars in values
 while IFS='=' read -r key value; do
-    # Skip blank lines and comments
+    # Skip blank lines, comments, and lines without '='
     [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "$value" && "$key" =~ ^[[:space:]]+$ ]] && continue
     # Strip trailing carriage return (Windows line endings)
     value="${value%$'\r'}"
+    # Trim leading & trailing whitespace from value
+    value="$(echo "$value" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
     export "$key"="$value"
 done < .env
 
@@ -78,9 +81,9 @@ if ! command -v mysql &> /dev/null; then
 fi
 
 # Build SSL args for mysql CLI
-MYSQL_SSL_ARGS=()
+MYSQL_SSL_ARGS=""
 if [ -n "${DB_SSL_CA:-}" ] && [ -f "${DB_SSL_CA}" ]; then
-    MYSQL_SSL_ARGS=(--ssl-ca="${DB_SSL_CA}" --ssl-mode=VERIFY_IDENTITY)
+    MYSQL_SSL_ARGS="--ssl-ca=${DB_SSL_CA} --ssl-mode=VERIFY_IDENTITY"
 fi
 
 # Run import — capture stderr in case of failure
@@ -88,14 +91,14 @@ echo "  Importing ${SQL_FILE} ..."
 MYSQL_ERR=$(mktemp)
 if ! mysql -u "${DB_USER}" -p"${DB_PASS}" \
      -h "${DB_HOST}" -P "${DB_PORT}" \
-     "${MYSQL_SSL_ARGS[@]}" \
+     ${MYSQL_SSL_ARGS} \
      --default-character-set=utf8mb4 < "${SQL_FILE}" 2>"${MYSQL_ERR}"; then
     echo "  ERROR: mysql import failed. Error output:"
     cat "${MYSQL_ERR}" 2>/dev/null || true
     rm -f "${MYSQL_ERR}"
     echo ""
     echo "  Retry manually:"
-    echo "    mysql -u ${DB_USER} -p -h ${DB_HOST} -P ${DB_PORT} ${MYSQL_SSL_ARGS[*]} < ${SQL_FILE}"
+    echo "    mysql -u ${DB_USER} -p -h ${DB_HOST} -P ${DB_PORT} ${MYSQL_SSL_ARGS} < ${SQL_FILE}"
     exit 1
 fi
 rm -f "${MYSQL_ERR}"
