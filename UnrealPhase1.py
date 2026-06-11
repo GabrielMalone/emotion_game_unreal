@@ -6,6 +6,7 @@ from emotion_game.player_guess import player_guess
 from emotionGameQueries import assign_next_emotion
 import openAIqueries
 from llm_client import client
+from streamNPCresponse.streamTextResponse import streamResponse
 from turnContext import EmotionGameTurn
 from emotionGameQueries import get_active_emotion, get_remaining_emotions
 from db import get_cursor
