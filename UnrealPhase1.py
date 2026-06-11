@@ -40,7 +40,6 @@ currentScene = """
 """
 from elevenlabsQueries import get_default_voice_id
 voiceId = get_default_voice_id()  # single source of truth — see elevenlabsQueries.py
-SERVER  = "http://localhost:5001"
 active_turns = {}  # this will be persistent for the lifetime of the socketio instance
 turn = EmotionGameTurn(
     idUser=idUser,

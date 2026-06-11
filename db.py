@@ -37,6 +37,13 @@ def _get_pool() -> MySQLConnectionPool:
             _database = os.getenv("DB_NAME", "camodb")
             _host = os.getenv("DB_HOST", "localhost")
             _port = int(os.getenv("DB_PORT", "3306"))
+        # --- SSL: configure when DB_SSL_CA env var is set ---
+        _ssl_ca = os.getenv("DB_SSL_CA")
+        _ssl_config: dict = {}
+        if _ssl_ca:
+            _ssl_config["ssl_ca"] = _ssl_ca
+            _ssl_config["ssl_verify_cert"] = os.getenv("DB_SSL_VERIFY_CERT", "true").lower() == "true"
+            _ssl_config["ssl_disabled"] = False
         _pool = MySQLConnectionPool(
             pool_name="emotion_game_pool",
             pool_size=5,
@@ -46,6 +53,7 @@ def _get_pool() -> MySQLConnectionPool:
             database=_database,
             host=_host,
             port=_port,
+            **_ssl_config,
         )
     return _pool
 

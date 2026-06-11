@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import List
 import threading
 
 @dataclass
@@ -20,7 +19,7 @@ class EmotionGameTurn:
     npc_memory:         str = ""
     player_text:        str = ""
     last_npc_text:      str = ""
-    cues:               List[str] = field(default_factory=list)
+    cues:               list[str] = field(default_factory=list)
     cancel_stream:      bool = False
     streaming:          bool = False
     audio_ready:        bool = True   # Unreal sets via npc_audio_ready handshake

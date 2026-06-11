@@ -140,3 +140,128 @@ class TestGetCuesForEmotion:
             assert len(cues) == 3
             assert all(isinstance(c, str) for c in cues)
             assert any("body" in c for c in cues)
+
+
+class TestClassifyPlayerResponseToGameStart:
+    """Tests for classify_player_response_to_game_start()."""
+
+    def test_agreement_returns_true(self):
+        from turnContext import EmotionGameTurn
+        turn = EmotionGameTurn(player_text="yes", last_npc_text="Will you help?")
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='{"agrees_to_help": true}'))
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        result = openAIqueries.classify_player_response_to_game_start(turn, mock_client)
+        assert result is True
+
+    def test_refusal_returns_false(self):
+        from turnContext import EmotionGameTurn
+        turn = EmotionGameTurn(player_text="no", last_npc_text="Will you help?")
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='{"agrees_to_help": false}'))
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        result = openAIqueries.classify_player_response_to_game_start(turn, mock_client)
+        assert result is False
+
+    def test_defaults_to_false_on_bad_json(self):
+        from turnContext import EmotionGameTurn
+        turn = EmotionGameTurn(player_text="maybe", last_npc_text="Will you help?")
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content="not json"))
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with pytest.raises(ValueError):
+            openAIqueries.classify_player_response_to_game_start(turn, mock_client)
+
+
+class TestClassifyEmotionGuess:
+    """Tests for classify_emotion_guess()."""
+
+    def test_returns_guessed_emotion(self):
+        from turnContext import EmotionGameTurn
+        turn = EmotionGameTurn(player_text="Are you feeling happy?")
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='{"guessed_emotion": "happy"}'))
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        result = openAIqueries.classify_emotion_guess(turn, mock_client)
+        assert result == "happy"
+
+    def test_returns_none_when_not_guessing(self):
+        from turnContext import EmotionGameTurn
+        turn = EmotionGameTurn(player_text="I like this game")
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='{"guessed_emotion": null}'))
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        result = openAIqueries.classify_emotion_guess(turn, mock_client)
+        assert result is None
+
+    def test_handles_markdown_wrapped_response(self):
+        from turnContext import EmotionGameTurn
+        turn = EmotionGameTurn(player_text="sad?")
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='```json\n{"guessed_emotion": "sad"}\n```'))
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        result = openAIqueries.classify_emotion_guess(turn, mock_client)
+        assert result == "sad"
+
+
+class TestPrewarmCueCache:
+    """Tests for prewarm_cue_cache()."""
+
+    def test_populates_cache_for_all_eight_emotions(self):
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='{"cues": ["a", "b", "c"]}'))
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        # Clear cache before test
+        openAIqueries._CUE_CACHE.clear()
+
+        openAIqueries.prewarm_cue_cache(mock_client)
+
+        assert len(openAIqueries._CUE_CACHE) == 8
+        expected = {"happy", "sad", "angry", "afraid", "surprised",
+                    "calm", "excited", "disgusted"}
+        assert set(openAIqueries._CUE_CACHE.keys()) == expected
+
+    def test_cache_values_are_lists_of_strings(self):
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='{"cues": ["one", "two", "three"]}'))
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        openAIqueries._CUE_CACHE.clear()
+        openAIqueries.prewarm_cue_cache(mock_client)
+
+        for emotion, cues in openAIqueries._CUE_CACHE.items():
+            assert isinstance(cues, list), f"{emotion}: {type(cues)}"
+            assert len(cues) == 3, f"{emotion}: {len(cues)}"
+            for cue in cues:
+                assert isinstance(cue, str)

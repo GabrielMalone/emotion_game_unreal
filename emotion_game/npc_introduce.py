@@ -1,3 +1,5 @@
+import logging
+
 from phase_2_queries import update_NPC_user_memory_query
 from streamNPCresponse.streamTextResponse import streamResponse
 import openAIqueries
@@ -6,6 +8,8 @@ from emotion_game.build_disagree_prompt import build_disagree_prompt
 from emotion_game.get_NPC_mem import getNPCmem
 from llm_client import client
 from turnContext import EmotionGameTurn
+
+logger = logging.getLogger(__name__)
 
 
 def npc_introduce(turn: EmotionGameTurn, sio):
@@ -21,7 +25,7 @@ def npc_introduce(turn: EmotionGameTurn, sio):
     # stream response from openAI
     r = streamResponse(turn, client=client, sio=sio)
     # debug
-    print("\nNPC INTRO RESPONSE: ", r)
+    logger.debug(f"NPC INTRO RESPONSE: {r}")
     # update npcs kb with its own response
     turn.npc_memory = f"[You just greeted {turn.player_name} with:] '{r}'"
     update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
@@ -45,7 +49,7 @@ def player_disagreed(turn: EmotionGameTurn, sio):
     turn.npc_memory = mem
     turn.prompt = build_disagree_prompt(turn)
     turn.last_npc_text = streamResponse(turn, client=client, sio=sio)
-    print("\nPLAYER's DISAGREEMENT: ", turn.player_text)
+    logger.debug(f"PLAYER's DISAGREEMENT: {turn.player_text}")
     try:
         sio.emit("npc_responded", {"text": turn.last_npc_text}, room=f"user:{turn.idUser}")
     except Exception:

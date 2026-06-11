@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from emotionGameQueries import *
+import logging
+
+logger = logging.getLogger(__name__)
+
 import re
 import json
 from typing import Generator, Optional
@@ -46,7 +49,7 @@ def getResponseStream(t: EmotionGameTurn, client) -> Generator[str, None, None]:
         return "".join(full)
 
     except Exception as e:
-        print("ERROR:", e)
+        logger.exception(f"getResponseStream failed: {e}")
 
 #------------------------------------------------------------------
 def classify_player_response_to_game_start(t : EmotionGameTurn, client):
@@ -90,7 +93,7 @@ def classify_player_response_to_game_start(t : EmotionGameTurn, client):
         temperature=0.0,
     )
 
-    print(f"\n PLAYER'S INPUT {t.player_text} MEANS DECIDED TO AGREE IS: {resp.choices[0].message.content}")
+    logger.debug(f"PLAYER'S INPUT {t.player_text} MEANS DECIDED TO AGREE IS: {resp.choices[0].message.content}")
 
     result = parse_llm_json(resp.choices[0].message.content)
     return bool(result.get("agrees_to_help", False))  

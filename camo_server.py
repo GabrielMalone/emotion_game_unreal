@@ -101,7 +101,10 @@ def _warmup_apis():
         except Exception as e:
             log.warning(f"ElevenLabs warmup failed (non-fatal): {e}")
 
-    t = threading.Thread(target=_warm, daemon=True)
+    # Non-daemon so the interpreter doesn't abort mid-API-call during
+    # shutdown (e.g. port conflict).  The warmup finishes in <10 s
+    # so it won't block startup meaningfully.
+    t = threading.Thread(target=_warm, daemon=False)
     t.start()
 
 # --------------------------------------------------
@@ -116,11 +119,21 @@ if __name__ == "__main__":
 
     log.info(f"Starting on {host}:{port}  debug={debug_mode}  allow_unsafe_werkzeug={unsafe_werkzeug}")
 
-    sio.run(
-        camo,
-        host=host,
-        port=port,
-        debug=debug_mode,
-        use_reloader=False,
-        allow_unsafe_werkzeug=unsafe_werkzeug,
-    )
+    try:
+        sio.run(
+            camo,
+            host=host,
+            port=port,
+            debug=debug_mode,
+            use_reloader=False,
+            allow_unsafe_werkzeug=unsafe_werkzeug,
+        )
+    except OSError as e:
+        log.error(f"Failed to bind {host}:{port} — {e}")
+        log.error("Is another instance already running?  Try: lsof -i :%d", port)
+        import sys
+        sys.exit(1)
+    except KeyboardInterrupt:
+        log.info("Shutting down (Ctrl+C)")
+        import sys
+        sys.exit(0)

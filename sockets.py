@@ -79,7 +79,10 @@ def init_socket_events(app):
         if _AUDIO_STREAMING:
             logger.info("[player_input] ignored — audio still streaming in Unreal")
             return
-        turn = active_turns[idUser]
+        turn = active_turns.get(idUser)
+        if turn is None:
+            logger.info("[player_input] ignored — no active turn for user")
+            return
         # Use explicit turn_in_progress flag instead of _lock.locked()
         # to avoid false-positives when lock is held by unrelated code.
         if turn.turn_in_progress:
@@ -120,7 +123,10 @@ def init_socket_events(app):
     @sio.on("npc_audio_ready")
     def on_npc_audio_ready(sid=None):
         logger.info("[npc_audio_ready] Unreal audio reset complete")
-        turn = active_turns[idUser]
+        turn = active_turns.get(idUser)
+        if turn is None:
+            logger.warning("[npc_audio_ready] no active turn — ignoring")
+            return
         turn.audio_ready = True
 
     @sio.on("player_stepped_away")

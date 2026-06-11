@@ -1,3 +1,5 @@
+import logging
+
 from phase_2_queries import update_NPC_user_memory_query
 from streamNPCresponse.streamTextResponse import streamResponse
 import openAIqueries
@@ -9,18 +11,20 @@ from emotionGameQueries import mark_emotion_guessed_correct, get_active_emotion,
 from emotion_game.build_did_not_make_guess_prompt import build_no_guess_prompt
 from emotion_game.get_NPC_mem import getNPCmem
 
+logger = logging.getLogger(__name__)
+
 
 def player_guess(turn: EmotionGameTurn, socketio) -> dict:
 
     # categorize player's emotion guess
     turn.emotion_guessed = openAIqueries.classify_emotion_guess(turn, client)
-    print(f"\nPLAYER GUESSED: {turn.emotion_guessed} by saying {turn.player_text}")
+    logger.debug(f"PLAYER GUESSED: {turn.emotion_guessed} by saying {turn.player_text}")
 
     # this means player has correctly guessed all emotions
     # could either end game at this point
     # or increase to next difficulty level
     if turn.game_over:
-        print("\nALL EMOTIONS ANSWERED!\n")
+        logger.debug("ALL EMOTIONS ANSWERED!")
         turn.npc_memory = f"{turn.player_name} correctly identified all of your emotions and completed the round"
         update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
         turn.npc_memory = getNPCmem(turn)
@@ -36,12 +40,12 @@ def player_guess(turn: EmotionGameTurn, socketio) -> dict:
     data = get_active_emotion(turn)
     npc_emotion = data["emotion"]
     npc_emotion_guessed_id = data["idEmotion"]
-    print(f"\nACTIVE NPC EMOTION: {npc_emotion}\n")
+    logger.debug(f"ACTIVE NPC EMOTION: {npc_emotion}")
 
     # if player did something other than make a guess
     # and this is not the intro conversation
     if turn.emotion_guessed is None and turn.game_started:
-        print(f"\nOTHER THAN GUESS BRANCH on statement {turn.player_text}\n")
+        logger.debug(f"OTHER THAN GUESS BRANCH on statement {turn.player_text}")
         turn.npc_memory = f"{turn.player_name} just made a statement that was not a guess: {turn.player_text}"
         if turn.player_text:
             update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
@@ -57,7 +61,7 @@ def player_guess(turn: EmotionGameTurn, socketio) -> dict:
 
     if turn.emotion_guessed == npc_emotion:
         # mark correct in database
-        print(f"CORRECT! {npc_emotion} == {turn.emotion_guessed}")
+        logger.debug(f"CORRECT! {npc_emotion} == {turn.emotion_guessed}")
         turn.emotion_guessed_id = npc_emotion_guessed_id
         mark_emotion_guessed_correct(turn)
         num_correct = get_num_correct(turn)
@@ -79,7 +83,7 @@ def player_guess(turn: EmotionGameTurn, socketio) -> dict:
         from emotion_game.build_correct_guess_prompt import build_correct_guess_prompt
         turn.prompt = build_correct_guess_prompt(turn)
         turn.last_npc_text = streamResponse(turn, client=client, sio=socketio)
-        print("\nNPC CORRECT GUESS RESPONSE:", turn.last_npc_text)
+        logger.debug(f"NPC CORRECT GUESS RESPONSE: {turn.last_npc_text}")
         try:
             socketio.emit("npc_responded", {"text": turn.last_npc_text}, room=f"user:{turn.idUser}")
         except Exception:
@@ -96,14 +100,14 @@ def player_guess(turn: EmotionGameTurn, socketio) -> dict:
         return {"status": "CorrectAskShare"}
 
     else:
-        print(f"INCORRECT! {turn.emotion_guessed} != {npc_emotion}")
+        logger.debug(f"INCORRECT! {turn.emotion_guessed} != {npc_emotion}")
         turn.npc_memory = f"{turn.player_name} said: {turn.player_text}. As a result {turn.player_name} incorrectly identified your emotion {turn.emotion_guessed}"
         update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
         turn.cues = openAIqueries.get_cues_for_emotion(npc_emotion, client=client)
         turn.prompt = build_incorrect_prompt(turn)
         turn.last_npc_text = streamResponse(turn, client=client, sio=socketio)
         # debug
-        print("\nNPC RESPONDED TO INCORRECT GUESS:", turn.last_npc_text)
+        logger.debug(f"NPC RESPONDED TO INCORRECT GUESS: {turn.last_npc_text}")
         try:
             socketio.emit("npc_responded", {"text": turn.last_npc_text}, room=f"user:{turn.idUser}")
         except Exception:
