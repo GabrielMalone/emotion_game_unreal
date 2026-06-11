@@ -147,6 +147,38 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
 
     turn.player_text = player_text
     turn.last_npc_text = npc_text
+
+    # -------- SHARE EXPERIENCE PHASE --------
+    if turn.waiting_for_share:
+        # Player shared their experience — thank them, then move on
+        from emotion_game.build_share_response_prompt import build_share_response_prompt
+        from phase_2_queries import update_NPC_user_memory_query
+        from emotion_game.get_NPC_mem import getNPCmem
+
+        turn.npc_memory = f"{turn.player_name} shared about a time they felt {turn.last_correct_emotion}: {turn.player_text}"
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
+        turn.npc_memory = getNPCmem(turn)
+
+        turn.prompt = build_share_response_prompt(turn)
+        turn.last_npc_text = streamResponse(turn, client=client, sio=sio)
+        print("\nNPC SHARE RESPONSE:", turn.last_npc_text)
+
+        turn.npc_memory = f"[You just responded to {turn.player_name} with:] '{turn.last_npc_text}'"
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
+
+        try:
+            sio.emit("npc_responded", {"text": turn.last_npc_text}, room=f"user:{turn.idUser}")
+        except Exception:
+            pass
+
+        # reset share state before moving on
+        turn.waiting_for_share = False
+        turn.last_correct_emotion = ""
+
+        # now assign the next emotion
+        assignEmotion(turn, sio)
+        return
+
     # -------- AGREEMENT PHASE --------
     if not turn.game_started:
 
@@ -168,9 +200,9 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
     turn.player_text = player_text
     res = player_guess(turn, socketio=sio)
 
-    if res["status"] == "True":
-        turn.npc_memory = res["turnData"].npc_memory
-        assignEmotion(turn, sio)
+    if res["status"] == "CorrectAskShare":
+        # NPC already streamed the "thanks + ask to share" response.
+        # waiting_for_share is set; just return and wait for player input.
         return
     if res["status"] == "False":
         return

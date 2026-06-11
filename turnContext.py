@@ -24,7 +24,9 @@ class EmotionGameTurn:
     cancel_stream:      bool = False
     streaming:          bool = False
     audio_ready:        bool = True   # Unreal sets via npc_audio_ready handshake
-    turn_in_progress:   bool = False  # explicit flag — prefer over _lock.locked()
-    word_gen:           int = 0       # bumped each stream to cancel old bg tasks
-    _lock:              threading.Lock = field(default_factory=threading.Lock)
-    _npc_data:          dict | None = None  # cached NPC persona (set once at game start)
+    turn_in_progress:     bool = False  # explicit flag — prefer over _lock.locked()
+    waiting_for_share:    bool = False  # player must share an experience before next emotion
+    last_correct_emotion: str  = ""     # emotion word the player just guessed correctly
+    word_gen:             int  = 0      # bumped each stream to cancel old bg tasks
+    _lock:                threading.Lock = field(default_factory=threading.Lock)
+    _npc_data:            dict | None = None  # cached NPC persona (set once at game start)

@@ -103,27 +103,22 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
     else:
         prompt += f"""
 
-    AFTER A CORRECT GUESS
-    --------------------
-    PHASE 1: Tell them they got it right.
-    - You MUST say the feeling word: {t.emotion_guessed}
-    - Say it exactly once in your first sentence.
-    - Like: "Yes — \"{t.emotion_guessed}\" is exactly how I feel."
-
-    PHASE 2: Tell them something new is happening.
-    - You MUST say that a NEW, DIFFERENT feeling has come.
+    NEXT EMOTION
+    ------------
+    - A new, different feeling has come since {t.player_name} last helped you.
+    - You MUST say that a new, different feeling is here.
     - Like: "Now I feel something new. It is different."
     - Keep it to one short sentence.
 
-    PHASE 3: Move naturally into talking about the new feeling.
+    - Move naturally into talking about the new feeling.
     - Do NOT use empty words like "After that" or "Then" or "Next."
 
-    PHASE 4: Tell them ONE memory connected to this new feeling.
+    - Tell them ONE memory connected to this new feeling.
     - The memory must be tied to how you feel right now.
     - Start with something like:
-    "This new feeling reminds me of a time when…"
+    "This new feeling reminds me of a time when\u2026"
 
-    PHASE 5: Tell them what your body feels and ask them to guess.
+    - Tell them what your body feels and ask them to guess.
 
     STYLE RULES
     -----------

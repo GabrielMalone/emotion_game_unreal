@@ -74,7 +74,26 @@ def player_guess(turn: EmotionGameTurn, socketio) -> dict:
         turn.npc_memory = f"{turn.player_name} said: {turn.player_text}. As a result {turn.player_name} correctly identified your emotion {turn.emotion_guessed}"
         update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
         turn.npc_memory = getNPCmem(turn)
-        return {"status": "True", "turnData": turn}
+
+        # --- stream the "correct guess" prompt (thanks + ask to share) ---
+        from emotion_game.build_correct_guess_prompt import build_correct_guess_prompt
+        turn.prompt = build_correct_guess_prompt(turn)
+        turn.last_npc_text = streamResponse(turn, client=client, sio=socketio)
+        print("\nNPC CORRECT GUESS RESPONSE:", turn.last_npc_text)
+        try:
+            socketio.emit("npc_responded", {"text": turn.last_npc_text}, room=f"user:{turn.idUser}")
+        except Exception:
+            pass
+
+        # update memory with NPC's response to the correct guess
+        turn.npc_memory = f"[You just responded to {turn.player_name} with:] '{turn.last_npc_text}'"
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
+
+        # set state: wait for player to share their experience
+        turn.waiting_for_share = True
+        turn.last_correct_emotion = npc_emotion
+
+        return {"status": "CorrectAskShare"}
 
     else:
         print(f"INCORRECT! {turn.emotion_guessed} != {npc_emotion}")
