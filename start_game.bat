@@ -35,7 +35,7 @@ if "%DB_USER%"=="" set "DB_USER=root"
 if "%DB_NAME%"=="" set "DB_NAME=camodb"
 if "%DB_HOST%"=="" set "DB_HOST=localhost"
 if "%DB_PORT%"=="" set "DB_PORT=3306"
-if "%DB_SSL_CA%"=="" set "DB_SSL_CA=isrg-root-x1.pem"
+if "%DB_SSL_CA%"=="" set "DB_SSL_CA="
 
 :: --- debug mode: skip remote DB, use local ---
 if not "%DEBUG_SHORT%"=="" (
@@ -122,7 +122,7 @@ if "%PLAYER_NAME_INPUT%"=="" (
 echo   Player: %PLAYER_NAME%
 
 :: ------------------------------------------------------------------
-:: 4. Start camo_server.py using the egvenv Python directly
+:: 4. Start camo_server.py using the venv Python directly
 :: ------------------------------------------------------------------
 echo.
 echo ================================================================
@@ -130,7 +130,7 @@ echo   Starting camo_server.py on http://0.0.0.0:5001 (Player: %PLAYER_NAME%)
 echo ================================================================
 echo.
 
-set "VENV_PYTHON=egvenv\Scripts\python.exe"
+set "VENV_PYTHON=venv\Scripts\python.exe"
 if not exist "%VENV_PYTHON%" (
     echo   ERROR: venv Python not found at %VENV_PYTHON%
     pause

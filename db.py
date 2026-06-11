@@ -23,28 +23,18 @@ def _get_pool() -> MySQLConnectionPool:
     global _pool
     if _pool is None:
         # --- debug mode: use local DB when DEBUG_SHORT_RESPONSES is set ---
-        # Reads DB credentials from env vars even in debug mode.
         _debug = os.getenv("DEBUG_SHORT_RESPONSES")
         if _debug:
-            print("[db] DEBUG_SHORT_RESPONSES set — using local DB")
-            ssl_config = {}
+            print("[db] DEBUG_SHORT_RESPONSES set - using local DB")
             _user = os.getenv("DB_USER", "root")
             _password = os.getenv("DB_DEBUG_PASSWORD") or os.getenv("DB_PASSWORD", "")
             _database = os.getenv("DB_NAME", "camodb")
             _host = "localhost"
             _port = int(os.getenv("DB_DEBUG_PORT", "3306"))
         else:
-            ssl_ca = os.getenv("DB_SSL_CA")
-            ssl_config = {}
-            if ssl_ca:
-                ssl_config = {
-                    "ssl_ca": ssl_ca,
-                    "ssl_verify_cert": True,
-                    "ssl_verify_identity": True,
-                }
-            _user = os.getenv("DB_USER")
-            _password = os.getenv("DB_PASSWORD")
-            _database = os.getenv("DB_NAME")
+            _user = os.getenv("DB_USER", "root")
+            _password = os.getenv("DB_PASSWORD", "")
+            _database = os.getenv("DB_NAME", "camodb")
             _host = os.getenv("DB_HOST", "localhost")
             _port = int(os.getenv("DB_PORT", "3306"))
         _pool = MySQLConnectionPool(
@@ -56,7 +46,6 @@ def _get_pool() -> MySQLConnectionPool:
             database=_database,
             host=_host,
             port=_port,
-            **ssl_config,
         )
     return _pool
 
