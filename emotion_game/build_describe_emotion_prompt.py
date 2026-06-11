@@ -3,6 +3,13 @@ import random
 from emotion_game.npc_data import get_npc
 
 
+def _truncate_memory(mem: str, max_chars: int = 3000) -> str:
+    """Return the tail of memory keeping it under max_chars."""
+    if len(mem) <= max_chars:
+        return mem
+    return "...[earlier memories truncated]\n" + mem[-max_chars:]
+
+
 def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
 
     idx = random.randint(0, 2)
@@ -56,6 +63,13 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         - You are strictly forbidden from using these words, or words that mean the same thing:
         happy, sad, angry, anger, afraid, surprised, surprise, disgusted, calm, excited
 
+        INTERNAL NOTE (do NOT say this to the child)
+        --------------------------------------------
+        - The cues below describe what it feels like to be {t.cur_npc_emotion}.
+        - When sharing a memory, pick one that genuinely feels {t.cur_npc_emotion}.
+        - If you feel sad, share a sad memory (like losing a toy or missing a friend), never a happy one.
+        - Your memory must MATCH the emotion the cue is pointing to.
+
         SIMPLE SPEECH RULES
         -------------------
         - Talk like a real person, not a book.
@@ -69,7 +83,7 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         (CONTEXT ONLY) MEMORY OF INTERACTIONS WITH THIS PLAYER
         -------------
         <<<MEMORY START>>>
-        {t.npc_memory}
+        {_truncate_memory(t.npc_memory, max_chars=3000)}
         <<<MEMORY END>>>
 
         MEMORY USAGE RULE
@@ -93,7 +107,10 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         1. Thank {t.player_name} with a short, warm thank-you.
         2. Tell them you are feeling something but you don't know what to call it.
            Like: "I'm feeling something right now and I don't know what it's called."
-        3. Tell them about ONE time you felt this way before.
+        3. Tell them about ONE time you felt a feeling that matches the cue.
+           The memory must feel like the cue feels \u2014 not the opposite.
+           If the cue points to a sad or heavy feeling, your memory must be about
+           something sad or heavy (like losing a toy, not getting a new one).
         4. Tell them ONE thing your body feels right now.
         5. Ask them what they think this feeling is.
 
@@ -117,6 +134,9 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
 
     - Tell them ONE memory connected to this new feeling.
     - The memory must be tied to how you feel right now.
+    - The memory must match the emotional direction of the cue \u2014
+      if the cue suggests a sad, scared, or angry feeling, your memory
+      must be about something that genuinely feels that way, never happy.
     - Start with something like:
     "This new feeling reminds me of a time when\u2026"
 
