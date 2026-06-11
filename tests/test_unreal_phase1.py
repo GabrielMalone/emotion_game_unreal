@@ -128,24 +128,10 @@ class TestStartGame:
             turn._lock.release()
 
         with patch("UnrealPhase1._start_game_impl") as mock_impl:
-            start_game(mock_sio, player_name="Test")
+            start_game(mock_sio)
 
         assert not turn._lock.locked()
         mock_impl.assert_called_once_with(mock_sio)
-
-    def test_sets_player_name(self):
-        """start_game should set the player_name on the turn."""
-        from UnrealPhase1 import start_game, active_turns, idUser
-        turn = active_turns[idUser]
-        mock_sio = MagicMock()
-
-        if turn._lock.locked():
-            turn._lock.release()
-
-        with patch("UnrealPhase1._start_game_impl"):
-            start_game(mock_sio, player_name="CustomName")
-
-        assert turn.player_name == "CustomName"
 
     def test_ignores_when_locked(self):
         """start_game should no-op when the lock can't be acquired."""
@@ -287,7 +273,9 @@ class TestAdvanceGameImpl:
 
         assert turn.waiting_for_share is False
         assert turn.last_correct_emotion == ""
-        mock_assign.assert_called_once()
+        assert turn.waiting_for_continue is True
+        mock_sio.emit.assert_any_call("game_pause", {}, room=f"user:{turn.idUser}")
+        mock_assign.assert_not_called()
 
     def test_advance_correct_ask_share_path(self):
         """When player_guess returns 'CorrectAskShare', should return early."""
@@ -327,3 +315,35 @@ class TestTurnLock:
         # Just verify it's locked
         assert turn._lock.locked()
         turn._lock.release()
+
+
+# ──────────────────────────────────────────────────────────
+# continue_game
+# ──────────────────────────────────────────────────────────
+class TestContinueGame:
+    """Tests for continue_game()."""
+
+    def test_continue_calls_npc_introduce(self):
+        """When waiting_for_continue is True, continue_game should call npc_introduce."""
+        from UnrealPhase1 import continue_game
+        turn = make_turn(waiting_for_continue=True)
+        mock_sio = MagicMock()
+
+        with patch("UnrealPhase1.npc_introduce") as mock_intro, \
+             patch("phase_2_queries.update_NPC_user_memory_query"):
+            continue_game(turn, mock_sio)
+
+        assert turn.waiting_for_continue is False
+        assert turn.name_ask_from_continue is True
+        mock_intro.assert_called_once_with(turn, mock_sio)
+
+    def test_continue_ignored_when_not_waiting(self):
+        """When waiting_for_continue is False, continue_game should no-op."""
+        from UnrealPhase1 import continue_game
+        turn = make_turn(waiting_for_continue=False)
+        mock_sio = MagicMock()
+
+        with patch("UnrealPhase1.npc_introduce") as mock_intro:
+            continue_game(turn, mock_sio)
+
+        mock_intro.assert_not_called()

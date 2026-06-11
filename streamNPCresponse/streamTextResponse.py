@@ -5,7 +5,7 @@ import os
 import re
 import time
 from turnContext import EmotionGameTurn
-from elevenlabsQueries import tts_with_timestamps_cached, _char_alignments_to_words
+from elevenlabsQueries import tts_with_timestamps_cached, _char_alignments_to_words, VOICE_ENABLED
 
 logger = logging.getLogger(__name__)
 
@@ -60,59 +60,74 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
         _emit("npc_text_token", {"token": clean_sentence})
         sio.sleep(0.05)
 
-        ref = time.time()
         all_chars = []
         all_starts = []
         all_ends = []
-        for audio_chunk, chars, starts, ends in tts_with_timestamps_cached(
-            clean_sentence, t.voiceId, t.cur_npc_emotion
-        ):
-            if t.cancel_stream:
-                _emit("stream_cancelled")
-                t.streaming = False
-                return False
+        tts_ok = True
 
-            all_chars = chars
-            all_starts = starts
-            all_ends = ends
+        try:
+            ref = time.time()
+            for audio_chunk, chars, starts, ends in tts_with_timestamps_cached(
+                clean_sentence, t.voiceId, t.cur_npc_emotion
+            ):
+                if t.cancel_stream:
+                    _emit("stream_cancelled")
+                    t.streaming = False
+                    return False
 
-            _emit("npc_audio_chunk", {
-                "audio_chunk": base64.b64encode(audio_chunk).decode("utf-8"),
-            })
-            sio.sleep(0)
+                all_chars = chars
+                all_starts = starts
+                all_ends = ends
 
-        _emit("npc_audio_done")
-        sio.sleep(0)
+                if audio_chunk:
+                    _emit("npc_audio_chunk", {
+                        "audio_chunk": base64.b64encode(audio_chunk).decode("utf-8"),
+                    })
+                    sio.sleep(0)
+        except Exception as e:
+            logger.warning(f"TTS failed: {e} — falling back to server-timed word display")
+            tts_ok = False
+            ref = time.time()
 
-        # This sentence's audio will start playing at:
-        #   max(ref, cumulative_end)
-        # If Unreal is still playing previous audio, we queue behind it.
-        # If there was a gap (slow OpenAI), we start at ref (now).
         sentence_start = max(ref, cumulative_end)
         audio_duration = all_ends[-1] if all_ends else 0.0
         cumulative_end = sentence_start + audio_duration
 
         word_timings = _char_alignments_to_words(all_chars, all_starts, all_ends)
 
-        # Spawn a background task NOW so words start firing immediately
-        # (or after previous audio, thanks to sentence_start offset).
-        def _emit_words():
-            try:
-                gen = t.word_gen
-                for w in word_timings:
-                    if t.word_gen != gen or t.cancel_stream:
-                        break
-                    delay = (sentence_start + w["start"]) - time.time()
-                    if delay > 0:
-                        sio.sleep(delay)
-                    if t.word_gen != gen or t.cancel_stream:
-                        break
-                    if not _emit("show_word", {"word": w["word"]}):
-                        break
-            except Exception as e:
-                logger.error(f"[_emit_words] background task crashed: {e}", exc_info=True)
+        # --- Real audio + aligned word timings ---
+        if tts_ok and word_timings:
+            def _emit_words():
+                try:
+                    gen = t.word_gen
+                    for w in word_timings:
+                        if t.word_gen != gen or t.cancel_stream:
+                            break
+                        delay = (sentence_start + w["start"]) - time.time()
+                        if delay > 0:
+                            sio.sleep(delay)
+                        if t.word_gen != gen or t.cancel_stream:
+                            break
+                        if not _emit("show_word", {"word": w["word"]}):
+                            break
+                except Exception as e:
+                    logger.error(f"[_emit_words] background task crashed: {e}", exc_info=True)
 
-        sio.start_background_task(_emit_words)
+            sio.start_background_task(_emit_words)
+
+            _emit("npc_audio_done")
+
+        # --- Fallback: server-timed word display (no audio) ---
+        else:
+            raw_words = clean_sentence.split()
+            logger.info(f"[show_word] TTS fallback — emitting {len(raw_words)} words inline: {raw_words!r}")
+            for w in raw_words:
+                if t.cancel_stream:
+                    break
+                if not _emit("show_word", {"word": w}):
+                    break
+                sio.sleep(0.05)  # 50 ms per word (debugging speed)
+            _emit("npc_audio_done")
 
         return True
 
@@ -173,5 +188,11 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
 
     _emit("npc_stream_audio_done")
     sio.sleep(0)
+
+    # When voice is disabled, the caller emits npc_responded immediately
+    # after we return.  Sleep so Unreal has time to process the last
+    # npc_text_token/show_word events before npc_responded overwrites.
+    if not VOICE_ENABLED:
+        sio.sleep(0.5)
 
     return "".join(full_text)

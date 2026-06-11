@@ -1,4 +1,3 @@
-import os
 import logging
 from emotion_game.npc_introduce import npc_introduce, agree_check, player_disagreed
 from emotion_game.npc_describe_emotion import npc_describe_emotion
@@ -69,13 +68,7 @@ def assignEmotion(turn, sio):
     turn.guessing_started = True
 
 # -----------------------------------------------------------------------------------
-def start_game(sio, player_name: str = None):
-    if player_name is None:
-        player_name = os.environ.get("PLAYER_NAME", "Gabriel")
-
-    # Set the player name on the turn (from register_user or default)
-    turn.player_name = player_name
-
+def start_game(sio):
     # Acquire the turn lock so no emotion clicks sneak in during intro
     if not turn._lock.acquire(blocking=False):
         logger.debug("[start_game] ignored — another turn in progress")
@@ -125,6 +118,56 @@ def _start_game_impl(sio):
         player_guess(turn, sio)
         return
 
+    # --- Reconnect during name-ask phase: NPC asked for player's name,
+    #     player disconnected, come back and re-ask. ---
+    if turn.waiting_for_name:
+        # We can't know if the player already answered or not; safest is to
+        # re-ask the name question.
+        turn.game_started = False
+        turn.guessing_started = False
+        npc_introduce(turn, sio)
+        return
+
+    # --- Reconnect during pause-after-share: backend paused and
+    #     is waiting for Unreal to emit 'game_continue'.  Re-emit
+    #     game_pause so Unreal knows the paused state. ---
+    if turn.waiting_for_continue:
+        try:
+            sio.emit("game_pause", {}, room=f"user:{turn.idUser}")
+        except Exception:
+            pass
+        return
+
+    # --- Reconnect during share phase: player guessed correctly,
+    #     NPC asked "have you ever felt X?", then player disconnected.
+    #     No active emotion in DB, so restore the share prompt. ---
+    if turn.waiting_for_share:
+        from emotion_game.build_correct_guess_prompt import build_correct_guess_prompt
+        from phase_2_queries import update_NPC_user_memory_query
+        from emotion_game.get_NPC_mem import getNPCmem
+
+        turn.game_started = True
+        turn.guessing_started = True
+        sio.emit("game_start", {}, room=f"user:{turn.idUser}")
+        sio.emit("remaining_emotions",
+                {"remaining_emotions": get_remaining_emotions(turn)},
+                room=f"user:{turn.idUser}")
+
+        turn.npc_memory = getNPCmem(turn)
+        turn.prompt = build_correct_guess_prompt(turn)
+        turn.last_npc_text = streamResponse(turn, client=client, sio=sio)
+        try:
+            sio.emit("npc_responded", {"text": turn.last_npc_text},
+                    room=f"user:{turn.idUser}")
+        except Exception:
+            pass
+        turn.npc_memory = (
+            f"[You just responded to {turn.player_name} with:] "
+            f"'{turn.last_npc_text}'"
+        )
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
+        return
+
     res = get_active_emotion(turn)
     if res:
         turn.cur_npc_emotion = res["emotion"]
@@ -151,10 +194,81 @@ def advance_game(turn, player_text, npc_text, sio):
         turn._lock.release()
 
 
+def continue_game(turn, sio):
+    """Called when Unreal emits 'game_continue' after the post-share pause.
+    
+    A new player has walked up — NPC introduces itself and asks their name.
+    After the name is received, the NPC jumps straight to describing the
+    next emotion (skipping the agreement phase)."""
+    if not turn._lock.acquire(timeout=5):
+        logger.debug("[continue_game] ignored — lock held (timeout)")
+        return
+    turn.turn_in_progress = True
+    try:
+        if not turn.waiting_for_continue:
+            logger.debug("[continue_game] ignored — not waiting for continue")
+            return
+        turn.waiting_for_continue = False
+
+        # Reset for new player: skip full intro, just ask for name then go.
+        # Clear old NPC memory so the previous player's stories don't leak.
+        turn.npc_memory = ""
+        from phase_2_queries import update_NPC_user_memory_query
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser,
+                                    "[New player joined — memory reset]")
+        turn.game_started = False
+        turn.guessing_started = False
+        turn.name_ask_from_continue = True
+
+        npc_introduce(turn, sio)
+    finally:
+        turn.turn_in_progress = False
+        turn._lock.release()
+
+
 def _advance_game_impl(turn, player_text, npc_text, sio):
 
     turn.player_text = player_text
     turn.last_npc_text = npc_text
+
+    # -------- GAME PAUSED (waiting for Unreal to continue) --------
+    if turn.waiting_for_continue:
+        # Game is paused; ignore player input
+        return
+
+    # -------- PLAYER NAME PHASE --------
+    if turn.waiting_for_name:
+        # Player just told us their name
+        turn.player_name = player_text.strip()
+        turn.waiting_for_name = False
+        # After a game_continue name ask, skip the full intro and go
+        # straight to describing the next emotion.
+        if turn.name_ask_from_continue:
+            turn.name_ask_from_continue = False
+            turn.game_started = True
+            turn.guessing_started = False
+            # Remind NPC to greet the new player by name before describing
+            # the emotion (they skipped the full intro phase).
+            turn.npc_memory = (
+                f"[NOTE: A new player named {turn.player_name} is here. "
+                f"Greet them warmly by name before you start describing "
+                f"what you're feeling right now.]"
+            )
+            from phase_2_queries import update_NPC_user_memory_query
+            update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
+            try:
+                sio.emit("game_start", {}, room=f"user:{turn.idUser}")
+                sio.emit("remaining_emotions",
+                        {"remaining_emotions": get_remaining_emotions(turn)},
+                        room=f"user:{turn.idUser}")
+            except Exception:
+                pass
+            assignEmotion(turn, sio)
+            return
+        # NPC greets by name and explains their situation
+        from emotion_game.npc_introduce import npc_explain_situation
+        npc_explain_situation(turn, sio)
+        return
 
     # -------- SHARE EXPERIENCE PHASE --------
     if turn.waiting_for_share:
@@ -195,8 +309,12 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
         )
         update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
 
-        # now assign the next emotion
-        assignEmotion(turn, sio)
+        # --- pause: wait for Unreal to emit game_continue ---
+        turn.waiting_for_continue = True
+        try:
+            sio.emit("game_pause", {}, room=f"user:{turn.idUser}")
+        except Exception:
+            pass
         return
 
     # -------- AGREEMENT PHASE --------
