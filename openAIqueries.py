@@ -142,7 +142,7 @@ def normalize_emotion(emotion) -> str:
         return emotion["emotion"]
     raise ValueError(f"Invalid emotion: {emotion!r}")
 # ------------------------------------------------------------
-def generate_emotion_cues(emotion: str, client) -> list[str] | None:
+def generate_emotion_cues(emotion: str, client, _depth: int = 0) -> list[str] | None:
     # Callers (prewarm_cue_cache, get_cues_for_emotion) already normalize.
     print(f"DEBUGGING EMOTION SETTING {emotion}")
 
@@ -188,7 +188,24 @@ def generate_emotion_cues(emotion: str, client) -> list[str] | None:
             ],
         )
         content = parse_llm_json(resp.choices[0].message.content)
-        return content["cues"]
+        cues_raw = content["cues"]
+
+        # Hard filter — strip any cue that contains desire language.
+        # The prompt tells the LLM not to use these words but gpt-4o-mini
+        # sometimes still does.  This catch is cheaper than a bad NPC turn.
+        _DESIRE_WORDS = ("want", "wish", "hope")
+        cues = [c for c in cues_raw
+                if not any(w in c.lower().split() for w in _DESIRE_WORDS)]
+        if len(cues) < 3:
+            if _depth >= 2:
+                print(f"[cue-filter] gave up after {_depth} retries — using raw cues")
+                return cues_raw
+            # Regenerate — the LLM ignored the ban.
+            # This is very rare; the retry loop prevents an infinite guard.
+            print(f"[cue-filter] regen — only {len(cues)} clean cues from: {cues_raw}")
+            return generate_emotion_cues(emotion, client, _depth=_depth + 1)
+
+        return cues
 
     except Exception:
         # any parse / API / schema issue -> fallback
