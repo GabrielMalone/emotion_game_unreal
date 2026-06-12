@@ -94,7 +94,10 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         2. Tell them you are feeling something but you don't know what to call it.
            Like: "I'm feeling something right now and I don't know what it's called."
          3. Tell them about ONE time you felt this way before.
-            - The memory must match how the cues feel: happy cues → happy memory, sad cues → sad memory.
+            - FIRST, silently decide: do the cues feel HAPPY or SAD?
+            - If SAD (crying, frowning, looking down, hugging knees) → pick a SAD memory.
+            - If HAPPY (smiling, bouncing, laughing) → pick a HAPPY memory.
+            - NEVER mix them up: sad cues mean a sad memory. No hugs, no friends, no happy times.
         4. Tell them ONE thing your body feels right now.
         5. Ask them what they think this feeling is.
 
@@ -120,7 +123,10 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
     - Do NOT use empty words like "After that" or "Then" or "Next."
 
     PHASE 4: Tell them ONE memory connected to this new feeling.
-    - The memory must match how the cues feel: happy cues → happy memory, sad cues → sad memory.
+    - FIRST, silently decide: do the cues feel HAPPY or SAD?
+    - If SAD (crying, frowning, looking down, hugging knees) → pick a SAD memory.
+    - If HAPPY (smiling, bouncing, laughing) → pick a HAPPY memory.
+    - NEVER mix them up: sad cues mean a sad memory. No hugs, no friends, no happy times.
     - Start with something like:
     "This new feeling reminds me of a time when…"
 
