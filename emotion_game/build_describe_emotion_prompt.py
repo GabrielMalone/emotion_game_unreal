@@ -10,9 +10,9 @@ EMOTION_MEMORY_GUIDANCE = {
     "happy":     ("cheerful and bright", "like playing a fun game, getting a gift, being with friends, or laughing so hard your belly shakes"),
     "excited":   ("cheerful and bright", "like playing a fun game, getting a gift, being with friends, or laughing so hard your belly shakes"),
     "sad":       ("down and heavy",      "like losing a favorite toy, feeling left out of a game, scraping your knee, or missing someone who is far away"),
-    "afraid":    ("worried and jumpy",   "like being startled by a loud noise, feeling unsafe at night, hearing something creepy, or being alone in a dark room"),
+    "afraid":    ("worried and jumpy",   "being startled by a loud noise, feeling unsafe at night, hearing something creepy, or being alone in a dark room. ⚠️ Afraid memories are about SCARY or DANGEROUS things"),
     "angry":     ("hot and tight",       "like someone taking your toy without asking, being blamed for something you didn't do, or someone pushing you"),
-    "surprised": ("wide-eyed and wondering", "like opening a gift you did not expect, seeing a rainbow appear, a friend showing up when you thought they could not come, or hearing your name called for a prize"),
+    "surprised": ("bright-eyed and amazed", "opening a gift you did not expect, seeing a beautiful rainbow, a friend showing up, or hearing your name called for a prize. ⚠️ Surprised memories are WONDERFUL or unexpected in a GOOD way — NEVER loud noises, scary things, or danger"),
     "disgusted": ("yucky and gross",     "like tasting something spoiled, smelling something stinky, touching something slimy, or seeing something icky"),
     "calm":      ("quiet and peaceful",  "like cuddling a stuffed animal under a blanket, floating in a warm bath, being rocked by a grown-up, or listening to a bedtime story in a cozy room"),
 }
