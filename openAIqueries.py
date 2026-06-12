@@ -149,7 +149,11 @@ def generate_emotion_cues(emotion: str, client) -> list[str] | None:
     system = (
         "You generate short descriptions of emotions for young children (ages 4-7).\n"
         "Rules:\n"
-        "- Use concrete body sensations or everyday situations a young child knows\n"
+        "- Describe what the feeling FEELS LIKE or what someone DOES.\n"
+        "- NEVER use \"you want,\" \"you wish,\" \"you hope\" — that is longing, not feeling.\n"
+        "- Use concrete body sensations or completed actions a young child knows.\n"
+        "- Examples: \"Your face makes a big smile without even trying\" OK.\n"
+        "  \"You want to play with friends\" BAD — that sounds like you don't have it.\n"
         "- Use very simple words (kindergarten level)\n"
         "- No abstract or psychology words\n"
         "- Do NOT name the emotion\n"
@@ -161,10 +165,13 @@ def generate_emotion_cues(emotion: str, client) -> list[str] | None:
 
         Feeling: {emotion}
 
-        Each clue must be something a 4-7 year old child can understand, like:
-        1) A body feeling OR
-        2) Something that happens in everyday kid life OR
-        3) Something you can see someone do
+        Each clue must be something a 4-7 year old child can understand:
+        1) A body feeling (what their body does) OR
+        2) An action someone does when they feel this way OR
+        3) A thing you can see on someone's face
+
+        Each clue must describe what someone DOES or FEELS, never
+        what someone WANTS. "You smile" is good. "You want to smile" is bad.
 
         Use very simple words. Short sentences.
 
