@@ -93,7 +93,8 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         1. Thank {t.player_name} with a short, warm thank-you.
         2. Tell them you are feeling something but you don't know what to call it.
            Like: "I'm feeling something right now and I don't know what it's called."
-        3. Tell them about ONE time you felt this way before.
+         3. Tell them about ONE time you felt this way before.
+            - The memory must match how the cues feel: happy cues → happy memory, sad cues → sad memory.
         4. Tell them ONE thing your body feels right now.
         5. Ask them what they think this feeling is.
 
@@ -119,7 +120,7 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
     - Do NOT use empty words like "After that" or "Then" or "Next."
 
     PHASE 4: Tell them ONE memory connected to this new feeling.
-    - The memory must be tied to how you feel right now.
+    - The memory must match how the cues feel: happy cues → happy memory, sad cues → sad memory.
     - Start with something like:
     "This new feeling reminds me of a time when…"
 
