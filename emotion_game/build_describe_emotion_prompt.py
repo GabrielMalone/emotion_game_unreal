@@ -4,15 +4,17 @@ from emotion_game.npc_data import get_npc
 
 
 # Map each emotion to a category + concrete memory examples for the LLM.
+# CRITICAL: category labels must NOT contain forbidden words (happy, sad, angry,
+# afraid, surprised, disgusted, calm, excited) — the prompt forbids those words.
 EMOTION_MEMORY_GUIDANCE = {
-    "happy":     ("happy/joyful", "like playing, getting a gift, being with friends, or laughing"),
-    "excited":   ("happy/joyful", "like playing, getting a gift, being with friends, or laughing"),
-    "sad":       ("sad/unhappy",  "like losing something, feeling left out, being hurt, or missing someone"),
-    "afraid":    ("scared/fearful","like being startled, feeling unsafe, hearing something scary, or being alone in the dark"),
-    "angry":     ("angry/mad",    "like being blamed for something you didn't do, someone taking your toy, or feeling pushed"),
-    "surprised": ("surprised",    "like an unexpected noise, a sudden change, or someone jumping out and saying boo"),
-    "disgusted": ("disgusted",    "like tasting something yucky, smelling something bad, or touching something gross"),
-    "calm":      ("calm/peaceful","like sitting quietly, watching clouds, or listening to soft music"),
+    "happy":     ("cheerful and bright", "like playing a fun game, getting a gift, being with friends, or laughing so hard your belly shakes"),
+    "excited":   ("cheerful and bright", "like playing a fun game, getting a gift, being with friends, or laughing so hard your belly shakes"),
+    "sad":       ("down and heavy",      "like losing a favorite toy, feeling left out of a game, scraping your knee, or missing someone who is far away"),
+    "afraid":    ("worried and jumpy",   "like being startled by a loud noise, feeling unsafe at night, hearing something creepy, or being alone in a dark room"),
+    "angry":     ("hot and tight",       "like someone taking your toy without asking, being blamed for something you didn't do, or someone pushing you"),
+    "surprised": ("startled and wide-eyed", "like an unexpected pop, a sudden splash, someone jumping out, or seeing something you did not expect at all"),
+    "disgusted": ("yucky and gross",     "like tasting something spoiled, smelling something stinky, touching something slimy, or seeing something icky"),
+    "calm":      ("quiet and peaceful",  "like cuddling a stuffed animal under a blanket, floating in a warm bath, being rocked by a grown-up, or listening to a bedtime story in a cozy room"),
 }
 
 
