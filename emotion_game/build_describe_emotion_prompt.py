@@ -3,6 +3,19 @@ import random
 from emotion_game.npc_data import get_npc
 
 
+# Map each emotion to a category + concrete memory examples for the LLM.
+EMOTION_MEMORY_GUIDANCE = {
+    "happy":     ("happy/joyful", "like playing, getting a gift, being with friends, or laughing"),
+    "excited":   ("happy/joyful", "like playing, getting a gift, being with friends, or laughing"),
+    "sad":       ("sad/unhappy",  "like losing something, feeling left out, being hurt, or missing someone"),
+    "afraid":    ("scared/fearful","like being startled, feeling unsafe, hearing something scary, or being alone in the dark"),
+    "angry":     ("angry/mad",    "like being blamed for something you didn't do, someone taking your toy, or feeling pushed"),
+    "surprised": ("surprised",    "like an unexpected noise, a sudden change, or someone jumping out and saying boo"),
+    "disgusted": ("disgusted",    "like tasting something yucky, smelling something bad, or touching something gross"),
+    "calm":      ("calm/peaceful","like sitting quietly, watching clouds, or listening to soft music"),
+}
+
+
 def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
 
     idx = random.randint(0, 2)
@@ -13,6 +26,11 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
     print(f"\nPROMPT DEBUG. cues == {t.cues}")
 
     npc = getattr(t, '_npc_data', None) or get_npc(t.idNPC)
+
+    # Build memory guidance from the actual emotion word
+    category_label, memory_examples = EMOTION_MEMORY_GUIDANCE.get(
+        t.cur_npc_emotion, ("emotional", "matching the feeling")
+    )
 
     prompt = f"""
         You are an NPC in an emotional intelligence game for young children.
@@ -94,10 +112,9 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         2. Tell them you are feeling something but you don't know what to call it.
            Like: "I'm feeling something right now and I don't know what it's called."
          3. Tell them about ONE time you felt this way before.
-            - FIRST, silently decide: do the cues feel HAPPY or SAD?
-            - If SAD (crying, frowning, looking down, hugging knees) → pick a SAD memory.
-            - If HAPPY (smiling, bouncing, laughing) → pick a HAPPY memory.
-            - NEVER mix them up: sad cues mean a sad memory. No hugs, no friends, no happy times.
+            - Your memory MUST feel {category_label}.
+            - A {category_label} memory is {memory_examples}.
+            - DO NOT pick a memory that feels different from {category_label}.
         4. Tell them ONE thing your body feels right now.
         5. Ask them what they think this feeling is.
 
@@ -123,10 +140,9 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
     - Do NOT use empty words like "After that" or "Then" or "Next."
 
     PHASE 4: Tell them ONE memory connected to this new feeling.
-    - FIRST, silently decide: do the cues feel HAPPY or SAD?
-    - If SAD (crying, frowning, looking down, hugging knees) → pick a SAD memory.
-    - If HAPPY (smiling, bouncing, laughing) → pick a HAPPY memory.
-    - NEVER mix them up: sad cues mean a sad memory. No hugs, no friends, no happy times.
+    - Your memory MUST feel {category_label}.
+    - A {category_label} memory is {memory_examples}.
+    - DO NOT pick a memory that feels different from {category_label}.
     - Start with something like:
     "This new feeling reminds me of a time when…"
 

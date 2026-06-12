@@ -12,14 +12,15 @@ logger = logging.getLogger(__name__)
 
 def npc_describe_emotion(turn: EmotionGameTurn, sio) -> str:
     try:
-        # prompt for describing current emotion
-        turn.prompt = build_describe_emotion_prompt(turn)
-        # stream response from openAI
+        # fetch active emotion BEFORE building prompt so we can pass category guidance
         active = get_active_emotion(turn)
         if not active:
             logger.error("npc_describe_emotion called with no active emotion — aborting")
             return ""
         turn.cur_npc_emotion = active.get("emotion", "")
+
+        # prompt for describing current emotion
+        turn.prompt = build_describe_emotion_prompt(turn)
 
         sio.emit("current_emotion",
                 turn.cur_npc_emotion,
