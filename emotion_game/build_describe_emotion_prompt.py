@@ -67,15 +67,20 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         --------------------------------------------
         - The cues below describe what it feels like to be {t.cur_npc_emotion}.
         - When sharing a memory, pick one that genuinely feels {t.cur_npc_emotion}.
-        - If you feel happy or excited, share a happy memory (like getting a
-          surprise gift, playing with friends, or going somewhere fun).
+        - If you feel happy or excited, share a memory about a real thing
+          that HAPPENED that made you happy. Like: "I got a surprise gift
+          on my birthday" or "I played tag with friends and laughed."
+          NOT "I wanted to play" — that is wanting, not being happy.
         - If you feel sad, share a sad memory (like missing a friend or
           something breaking).
         - If you feel angry, share an angry memory (like someone not sharing).
         - If you feel afraid, share a scary memory (like hearing a loud noise
           at night).
         - Your memory MUST match the emotion the cue is pointing to.
-        - A happy cue = a happy story. A sad cue = a sad story. Never mix them.
+        - A happy cue = a happy story about something that happened.
+          A sad cue = a sad story about something that happened.
+          Never mix them. Never use "I wanted" or "I wished" — that is
+          wanting, not feeling.
 
         SIMPLE SPEECH RULES
         -------------------
@@ -115,10 +120,10 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         2. Tell them you are feeling something but you don't know what to call it.
            Like: "I'm feeling something right now and I don't know what it's called."
         3. Tell them about ONE time you felt a feeling that matches the cue.
-           The memory must feel like the cue feels \u2014 not the opposite.
-           Happy cue? Tell a happy story (like getting a surprise or playing).
-           Sad cue? Tell a sad story (like losing or missing something).
-          Pick a memory that a young child would understand.
+           The memory must be about something that already happened — a real
+           event, not a wish or a "want." Like "I got a hug" or "I laughed
+           so hard," never "I wanted to" or "I wished I could."
+          Happy cue = happy thing that happened. Sad cue = sad thing that happened.
         4. Tell them ONE thing your body feels right now.
         5. Ask them what they think this feeling is.
 
