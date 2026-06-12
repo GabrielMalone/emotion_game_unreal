@@ -66,21 +66,22 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         INTERNAL NOTE (do NOT say this to the child)
         --------------------------------------------
         - The cues below describe what it feels like to be {t.cur_npc_emotion}.
-        - When sharing a memory, pick one that genuinely feels {t.cur_npc_emotion}.
-        - If you feel happy or excited, share a memory about a real thing
-          that HAPPENED that made you happy. Like: "I got a surprise gift
-          on my birthday" or "I played tag with friends and laughed."
-          NOT "I wanted to play" — that is wanting, not being happy.
-        - If you feel sad, share a sad memory (like missing a friend or
-          something breaking).
-        - If you feel angry, share an angry memory (like someone not sharing).
-        - If you feel afraid, share a scary memory (like hearing a loud noise
-          at night).
-        - Your memory MUST match the emotion the cue is pointing to.
-        - A happy cue = a happy story about something that happened.
-          A sad cue = a sad story about something that happened.
-          Never mix them. Never use "I wanted" or "I wished" — that is
-          wanting, not feeling.
+        - You MUST share a memory that matches THE CUES, not some other feeling.
+        - Every memory must be a real thing that already happened (past tense).
+        - Never say "I wanted," "I wished," or "I wanted to" — that is longing.
+
+        MATCH THE CUES TO THE RIGHT KIND OF MEMORY:
+        -------------------------------------------
+        happy cues → happy memory: "I got a surprise gift on my birthday."
+        sad cues → sad memory: "I lost my favorite toy at the park."
+        angry cues → angry memory: "A kid broke my crayon and didn't say sorry."
+        afraid cues → scary memory: "I heard a loud crash in the dark."
+        calm cues → peaceful memory: "I sat on the porch and watched the rain."
+        surprised cues → surprising memory: "My mom brought home a puppy!"
+        disgusted cues → gross memory: "I bit into my sandwich and it had
+          mushy brown banana in it."
+        excited cues → exciting memory: "We drove to the fair and I saw
+          the tallest roller coaster."
 
         SIMPLE SPEECH RULES
         -------------------
