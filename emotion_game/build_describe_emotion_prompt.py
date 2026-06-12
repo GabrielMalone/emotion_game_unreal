@@ -67,8 +67,15 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
         --------------------------------------------
         - The cues below describe what it feels like to be {t.cur_npc_emotion}.
         - When sharing a memory, pick one that genuinely feels {t.cur_npc_emotion}.
-        - If you feel sad, share a sad memory (like losing a toy or missing a friend), never a happy one.
-        - Your memory must MATCH the emotion the cue is pointing to.
+        - If you feel happy or excited, share a happy memory (like getting a
+          surprise gift, playing with friends, or going somewhere fun).
+        - If you feel sad, share a sad memory (like missing a friend or
+          something breaking).
+        - If you feel angry, share an angry memory (like someone not sharing).
+        - If you feel afraid, share a scary memory (like hearing a loud noise
+          at night).
+        - Your memory MUST match the emotion the cue is pointing to.
+        - A happy cue = a happy story. A sad cue = a sad story. Never mix them.
 
         SIMPLE SPEECH RULES
         -------------------
@@ -109,8 +116,9 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
            Like: "I'm feeling something right now and I don't know what it's called."
         3. Tell them about ONE time you felt a feeling that matches the cue.
            The memory must feel like the cue feels \u2014 not the opposite.
-           If the cue points to a sad or heavy feeling, your memory must be about
-           something sad or heavy (like losing a toy, not getting a new one).
+           Happy cue? Tell a happy story (like getting a surprise or playing).
+           Sad cue? Tell a sad story (like losing or missing something).
+          Pick a memory that a young child would understand.
         4. Tell them ONE thing your body feels right now.
         5. Ask them what they think this feeling is.
 
@@ -135,8 +143,7 @@ def build_describe_emotion_prompt(t: EmotionGameTurn) -> str:
     - Tell them ONE memory connected to this new feeling.
     - The memory must be tied to how you feel right now.
     - The memory must match the emotional direction of the cue \u2014
-      if the cue suggests a sad, scared, or angry feeling, your memory
-      must be about something that genuinely feels that way, never happy.
+      happy cue = happy memory, sad cue = sad memory. Never the opposite.
     - Start with something like:
     "This new feeling reminds me of a time when\u2026"
 
