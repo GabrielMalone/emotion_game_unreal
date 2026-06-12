@@ -42,13 +42,14 @@ def make_turn(**overrides) -> EmotionGameTurn:
 # build_intro_prompt
 # ──────────────────────────────────────────────
 class TestBuildIntroPrompt:
-    def test_contains_npc_name_and_player_name(self):
+    def test_contains_npc_name_but_not_player_name(self):
         from emotion_game.build_intro_prompt import build_intro_prompt
         turn = make_turn()
         with patch("emotion_game.build_intro_prompt.get_npc", return_value=NPC_MOCK):
             result = build_intro_prompt(turn)
         assert "Luna" in result
-        assert "Alex" in result
+        # Intro prompt asks for the player's name — NPC doesn't know it yet
+        assert "Alex" not in result
 
     def test_mentions_first_meeting(self):
         from emotion_game.build_intro_prompt import build_intro_prompt
@@ -103,7 +104,7 @@ class TestBuildDescribeEmotionPrompt:
         turn = make_turn(guessing_started=True)
         with patch("emotion_game.build_describe_emotion_prompt.get_npc", return_value=NPC_MOCK):
             result = build_describe_emotion_prompt(turn)
-        assert "NEXT EMOTION" in result
+        assert "AFTER A CORRECT GUESS" in result
 
     def test_includes_cues_section(self):
         from emotion_game.build_describe_emotion_prompt import build_describe_emotion_prompt
