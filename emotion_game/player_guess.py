@@ -7,7 +7,7 @@ from emotion_game.build_incorrect_prompt import build_incorrect_prompt
 from emotion_game.build_answered_all_correctly_prompt import build_end_round_prompt
 from llm_client import client
 from turnContext import EmotionGameTurn
-from emotionGameQueries import mark_emotion_guessed_correct, get_active_emotion, get_num_correct, get_remaining_emotions
+from emotionGameQueries import mark_emotion_guessed_correct, get_active_emotion, get_num_correct, get_remaining_emotions, log_guess_attempt, append_game_md_log
 from emotion_game.build_did_not_make_guess_prompt import build_no_guess_prompt
 from emotion_game.get_NPC_mem import getNPCmem
 
@@ -25,6 +25,8 @@ def player_guess(turn: EmotionGameTurn, socketio) -> dict:
     # or increase to next difficulty level
     if turn.game_over:
         logger.debug("ALL EMOTIONS ANSWERED!")
+        append_game_md_log(turn, "round_end",
+                          f"All emotions guessed correctly! Round complete.")
         turn.npc_memory = f"{turn.player_name} correctly identified all of your emotions and completed the round"
         update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
         turn.npc_memory = getNPCmem(turn)
@@ -57,6 +59,10 @@ def player_guess(turn: EmotionGameTurn, socketio) -> dict:
             socketio.emit("npc_responded", {"text": turn.last_npc_text}, room=f"user:{turn.idUser}")
         except Exception:
             pass
+        log_guess_attempt(turn, player_guess=turn.player_text, correct=False,
+                          feedback_text=turn.last_npc_text)
+        append_game_md_log(turn, "statement",
+                          f"{turn.player_name} said: _{turn.player_text}_\n\nNPC: _{turn.last_npc_text}_")
         return {"status": "Other"}
 
     if turn.emotion_guessed == npc_emotion:
@@ -93,6 +99,15 @@ def player_guess(turn: EmotionGameTurn, socketio) -> dict:
         turn.npc_memory = f"[You just responded to {turn.player_name} with:] '{turn.last_npc_text}'"
         update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
 
+        # log the correct guess to the database
+        log_guess_attempt(turn, player_guess=turn.player_text, correct=True,
+                          feedback_text=turn.last_npc_text)
+
+        append_game_md_log(turn, "correct",
+                          f"Guessed: **{npc_emotion}** (correct)\n\n"
+                          f"{turn.player_name} said: _{turn.player_text}_\n\n"
+                          f"NPC: _{turn.last_npc_text}_")
+
         # set state: wait for player to share their experience
         turn.waiting_for_share = True
         turn.last_correct_emotion = npc_emotion
@@ -112,4 +127,10 @@ def player_guess(turn: EmotionGameTurn, socketio) -> dict:
             socketio.emit("npc_responded", {"text": turn.last_npc_text}, room=f"user:{turn.idUser}")
         except Exception:
             pass
+        log_guess_attempt(turn, player_guess=turn.player_text, correct=False,
+                          feedback_text=turn.last_npc_text)
+        append_game_md_log(turn, "incorrect",
+                          f"Guessed: **{turn.emotion_guessed}** (incorrect, actual: _{npc_emotion}_)\n\n"
+                          f"{turn.player_name} said: _{turn.player_text}_\n\n"
+                          f"NPC: _{turn.last_npc_text}_")
         return {"status": "False"}

@@ -297,3 +297,69 @@ def parse_llm_json(text: str) -> dict:
         return json.loads(match.group(0))
 
     raise ValueError(f"Could not parse JSON from LLM output:\n{text}")
+
+# ------------------------------------------------------------
+def extract_player_name(raw_text: str, client) -> str:
+    """Extract a person's name from freeform player input via LLM.
+
+    Handles patterns like:
+      - "my name is Gabe"      → "Gabe"
+      - "i'm Sarah"            → "Sarah"
+      - "call me Alex"         → "Alex"
+      - "you can call me Sir"  → "Sir"
+      - "Bob" (just the name)  → "Bob"
+      - "hello" (no name)      → "" (empty, caller should re-ask)
+
+    Falls back to regex on LLM failure or empty return.
+    Last resort: returns the raw text as-is.
+    """
+    system = (
+        "You are a name extractor. Extract the person's name from their message. "
+        "Look for patterns like 'my name is X', 'I'm X', 'call me X', "
+        "'you can call me X', or a single word that is clearly a name. "
+        "Return ONLY the name, nothing else — no quotes, no punctuation. "
+        "If there is genuinely no name at all, return a single word: NONE"
+    )
+    user_prompt = f'Player input: """{raw_text}"""'
+
+    name: str = ""
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.0,
+            max_tokens=20,
+        )
+        name = resp.choices[0].message.content.strip()
+        name = name.strip('"').strip("'").rstrip(".! ")
+    except Exception as e:
+        logger.warning(f"[name-extract] LLM call failed: {e}")
+        name = ""  # empty → fall into regex below
+
+    # If LLM returned "NONE" it means no name was found
+    if name.upper() == "NONE":
+        name = ""
+
+    # Regex fallback: try common patterns if LLM gave us nothing
+    if not name:
+        import re
+        for pattern in [
+            r"(?:you can call me|call me|my name is|i am|i'm|it's)\s+([a-zA-Z]+)",
+            r"^([a-zA-Z]{2})$",  # single word that looks like a name
+        ]:
+            m = re.search(pattern, raw_text, re.IGNORECASE)
+            if m:
+                name = m.group(1).capitalize()
+                logger.info(f"[name-extract] regex fallback: '{raw_text}' → '{name}'")
+                break
+
+    # Only keep first name (e.g. "Gabriel Malone" → "Gabriel")
+    if name:
+        name = name.split()[0]
+
+    logger.debug(f"[name-extract] raw='{raw_text}' → name='{name}'")
+    return name

@@ -3,7 +3,7 @@ import logging
 from phase_2_queries import update_NPC_user_memory_query
 from streamNPCresponse.streamTextResponse import streamResponse
 import openAIqueries
-from emotion_game.build_intro_prompt import build_intro_prompt
+from emotion_game.build_intro_prompt import build_intro_prompt, build_explain_situation_prompt
 from emotion_game.build_disagree_prompt import build_disagree_prompt
 from emotion_game.get_NPC_mem import getNPCmem
 from llm_client import client
@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 def npc_introduce(turn: EmotionGameTurn, sio):
+    """Very first NPC line: introduce self, explain the lost-feeling-names
+    dilemma, and ask for the player's name (\"Can you help me? What's your name?\").
+    The player's name unlocks the game — no separate agreement step."""
 
     # start out worried for this scenario
     turn.cur_npc_emotion = "worried"
@@ -25,14 +28,41 @@ def npc_introduce(turn: EmotionGameTurn, sio):
     # stream response from openAI
     r = streamResponse(turn, client=client, sio=sio)
     # debug
-    logger.debug(f"NPC INTRO RESPONSE: {r}")
+    logger.debug(f"NPC INTRO (name ask) RESPONSE: {r}")
     # update npcs kb with its own response
-    turn.npc_memory = f"[You just greeted {turn.player_name} with:] '{r}'"
+    turn.npc_memory = f"[You just introduced yourself and asked for their name with:] '{r}'"
     update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
+    # NPC is now waiting for the player to tell them their name
+    turn.waiting_for_name = True
     try:
         sio.emit("npc_responded", {"text": r}, room=f"user:{turn.idUser}")
     except Exception:
         pass  # socket already dead (walk-away / disconnect)
+
+
+def npc_explain_situation(turn: EmotionGameTurn, sio):
+    """After the player shares their name: greet by name, explain the
+    loss-of-emotion-names situation, mention a new unknown emotion
+    is happening right now, and bridge to describing it.
+    (The caller immediately transitions into the game — no agreement phase.)"""
+
+    turn.cur_npc_emotion = "worried"
+    if turn._npc_data is None:
+        from emotion_game.npc_data import get_npc
+        turn._npc_data = get_npc(turn.idNPC)
+
+    turn.prompt = build_explain_situation_prompt(turn)
+    r = streamResponse(turn, client=client, sio=sio)
+    logger.debug(f"NPC EXPLAIN SITUATION RESPONSE: {r}")
+
+    turn.npc_memory = f"[You just greeted {turn.player_name} by name and explained your problem with:] '{r}'"
+    update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
+
+    turn.waiting_for_name = False
+    try:
+        sio.emit("npc_responded", {"text": r}, room=f"user:{turn.idUser}")
+    except Exception:
+        pass
 
 
 def agree_check(turn: EmotionGameTurn) -> bool:

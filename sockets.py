@@ -62,12 +62,9 @@ def init_socket_events(app):
 
     @sio.on("register_user")
     def register_user(data=None):
-        player_name = None
-        if data and data.get("player_name", "").strip():
-            player_name = data["player_name"].strip()
-        logger.info(f"[register_user] player_name={player_name}")
+        logger.info("[register_user] registered")
         join_room(f"user:{idUser}")
-        start_game(sio=sio, player_name=player_name)
+        start_game(sio=sio)
 
     @sio.on("player_input")
     def on_player_input(data):
@@ -151,6 +148,16 @@ def init_socket_events(app):
                 data.get("last_npc_text", ""),
                 sio=sio,
             )
+
+    @sio.on("game_continue")
+    def on_game_continue(data=None):
+        logger.info("[game_continue] received from Unreal")
+        turn = active_turns.get(idUser)
+        if turn is None:
+            logger.info("[game_continue] ignored — no active turn")
+            return
+        from UnrealPhase1 import continue_game
+        continue_game(turn, sio)
 
     @sio.on("get_cur_emotion")
     def getCurEmotion(data=None):

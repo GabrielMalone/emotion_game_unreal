@@ -11,6 +11,7 @@ class TestUpdateNPCUserMemory:
     def test_executes_upsert(self):
         from phase_2_queries import update_NPC_user_memory_query
         mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = ["short memory"]  # below prune threshold
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
@@ -21,12 +22,14 @@ class TestUpdateNPCUserMemory:
 
             update_NPC_user_memory_query(1, 42, "Player was nice.")
 
-        mock_cursor.execute.assert_called_once()
-        mock_conn.commit.assert_called_once()
+        # INSERT + SELECT (no UPDATE since memory is short)
+        assert mock_cursor.execute.call_count == 2
+        mock_conn.commit.assert_called()
 
     def test_passes_correct_params(self):
         from phase_2_queries import update_NPC_user_memory_query
         mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = ["short memory"]
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
@@ -36,9 +39,10 @@ class TestUpdateNPCUserMemory:
 
             update_NPC_user_memory_query(5, 10, "test memory")
 
-        call_args = mock_cursor.execute.call_args
-        args, _ = call_args
-        # Positional params: (idNPC, idUser, kbText)
+        # First call (INSERT) args
+        first_call = mock_cursor.execute.call_args_list[0]
+        args = first_call[0]  # positional args tuple
+        # Positional params: (query_string, (idNPC, idUser, kbText))
         assert args[1][0] == 5   # idNPC
         assert args[1][1] == 10  # idUser
         assert args[1][2] == "test memory"

@@ -523,8 +523,10 @@ CREATE TABLE camodb.emotion_guess_attempt (
 
   player_guess VARCHAR(64) NOT NULL,
   correct TINYINT(1) NOT NULL,
+  player_name VARCHAR(64) NULL COMMENT 'Extracted player name at time of guess',
 
   feedback_text TEXT NULL,
+  share_story TEXT NULL COMMENT 'Player follow-up: a time they felt this emotion',
   attemptedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   PRIMARY KEY (idAttempt),
@@ -630,3 +632,14 @@ VALUES (
   0.5,
   50
 );
+
+-- -----------------------------------------------------
+-- Migration: add player_name + share_story to emotion_guess_attempt
+-- (safe to run on existing DBs — IF NOT EXISTS in 8.0+)
+-- -----------------------------------------------------
+-- ALTER TABLE camodb.emotion_guess_attempt
+--   ADD COLUMN IF NOT EXISTS player_name VARCHAR(64) NULL
+--   COMMENT 'Extracted player name at time of guess';
+-- ALTER TABLE camodb.emotion_guess_attempt
+--   ADD COLUMN IF NOT EXISTS share_story TEXT NULL
+--   COMMENT 'Player follow-up: a time they felt this emotion';

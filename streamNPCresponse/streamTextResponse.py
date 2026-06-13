@@ -11,6 +11,46 @@ logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 32_768  # 32 KB
 
+# ------------------------------------------------------------------
+# Debug voice: when VOICE_ENABLED is False, stream arnold.mp3 as
+# placeholder audio.  Emitted once per NPC response (not per sentence)
+# to keep debugging fast.  Offset advances through the file so each
+# NPC turn sounds different.
+# ------------------------------------------------------------------
+_DEBUG_AUDIO_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "arnold.mp3")
+_DEBUG_AUDIO_DATA: bytes | None = None
+_DEBUG_AUDIO_OFFSET: int = 0
+_DEBUG_AUDIO_CHUNKS_PER_RESPONSE = 1  # 1 × 32KB ≈ 32KB ≈ 2 sec per NPC response
+
+def _load_debug_audio() -> bytes:
+    """Lazy-load arnold.mp3 into memory (cached after first call)."""
+    global _DEBUG_AUDIO_DATA
+    if _DEBUG_AUDIO_DATA is None:
+        try:
+            with open(_DEBUG_AUDIO_FILE, "rb") as f:
+                _DEBUG_AUDIO_DATA = f.read()
+            logger.info(f"[debug-audio] loaded {_DEBUG_AUDIO_FILE} ({len(_DEBUG_AUDIO_DATA)} bytes)")
+        except FileNotFoundError:
+            logger.warning(f"[debug-audio] {_DEBUG_AUDIO_FILE} not found — falling back to silent words")
+            _DEBUG_AUDIO_DATA = b""
+    return _DEBUG_AUDIO_DATA
+
+
+def _emit_debug_audio(sio, _emit, t, chunk_count: int = 2) -> None:
+    """Emit a few chunks of arnold.mp3 always from the start (safe for every turn)."""
+    audio = _load_debug_audio()
+    if not audio:
+        return
+    for i in range(chunk_count):
+        if t.cancel_stream:
+            break
+        start = i * CHUNK_SIZE
+        chunk = audio[start : start + CHUNK_SIZE]
+        if not chunk:
+            break
+        _emit("npc_audio_chunk", {"audio_chunk": base64.b64encode(chunk).decode("utf-8")})
+        sio.sleep(0)
+
 def _strip_tags(text: str) -> str:
     """Remove [emotion tags] and normalize whitespace for clean text tokens."""
     text = re.sub(r'\s*\[.*?\]\s*', ' ', text)   # strip bracket tags
@@ -117,10 +157,9 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
 
             _emit("npc_audio_done")
 
-        # --- Fallback: server-timed word display (no audio) ---
+        # --- Debug voice: words only, no delay (audio was emitted once at response start) ---
         else:
             raw_words = clean_sentence.split()
-            logger.info(f"[show_word] TTS fallback — emitting {len(raw_words)} words inline: {raw_words!r}")
             for w in raw_words:
                 if t.cancel_stream:
                     break
@@ -130,6 +169,13 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
             _emit("npc_audio_done")
 
         return True
+
+    # ----------------------------------------------------------
+    # Debug voice: fire placeholder audio once per NPC response.
+    # Offset advances so each turn sounds different.
+    # ----------------------------------------------------------
+    if not VOICE_ENABLED:
+        _emit_debug_audio(sio, _emit, t, chunk_count=_DEBUG_AUDIO_CHUNKS_PER_RESPONSE)
 
     # ----------------------------------------------------------
     # stream text + audio (closed-captioning style)
@@ -190,7 +236,7 @@ def streamResponse(t: EmotionGameTurn, client, sio) -> str:
     sio.sleep(0)
 
     # When voice is disabled, the caller emits npc_responded immediately
-    # after we return.  Sleep so Unreal has time to process the last
+    # after we return.  Yield so Unreal has time to process the last
     # npc_text_token/show_word events before npc_responded overwrites.
     if not VOICE_ENABLED:
         sio.sleep(0.5)

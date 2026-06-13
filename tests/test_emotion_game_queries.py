@@ -182,3 +182,147 @@ class TestAssignNextEmotion:
             assign_next_emotion(make_turn())
 
         assert mock_cursor.execute.call_count == 3
+
+
+# ------------------------------------------------------------------
+# New: guess attempt logging + share story persistence
+# ------------------------------------------------------------------
+
+class TestLogGuessAttempt:
+    """Tests for log_guess_attempt()."""
+
+    def test_inserts_correct_guess(self):
+        from emotionGameQueries import log_guess_attempt
+        mock_cursor = MagicMock()
+        mock_cursor.lastrowid = 42
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        turn = make_turn(player_name="Alice", emotion_guessed_id=3)
+        turn.idUser = 1
+        turn.idNPC = 2
+
+        with patch("emotionGameQueries.get_cursor") as mock_get_cursor:
+            mock_get_cursor.return_value.__enter__.return_value = (mock_conn, mock_cursor)
+
+            result = log_guess_attempt(turn, player_guess="happy", correct=True,
+                                       feedback_text="Yes! That's right!")
+
+        assert result == 42
+        mock_conn.commit.assert_called_once()
+        call_args = mock_cursor.execute.call_args
+        args, _ = call_args
+        params = args[1]  # positional params tuple
+        assert params[0] == 1   # idUser
+        assert params[1] == 2   # idNPC
+        assert params[2] == 3   # idEmotion
+        assert params[3] == "happy"  # player_guess
+        assert params[4] == 1   # correct
+        assert params[5] == "Alice"  # player_name
+        assert "Yes!" in params[6]   # feedback_text
+
+    def test_inserts_incorrect_guess_with_active_emotion(self):
+        from emotionGameQueries import log_guess_attempt
+        mock_cursor = MagicMock()
+        mock_cursor.lastrowid = 7
+        mock_cursor.fetchone.return_value = {"idEmotion": 4, "emotion": "sad"}
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        turn = make_turn(player_name="Bob")
+
+        with patch("emotionGameQueries.get_cursor") as mock_get_cursor:
+            mock_get_cursor.return_value.__enter__.return_value = (mock_conn, mock_cursor)
+
+            result = log_guess_attempt(turn, player_guess="angry", correct=False)
+
+        assert result == 7
+        # For incorrect guesses, get_active_emotion is called (a second
+        # get_cursor context) — that means execute is called at least twice
+        # (once for the active query, once for the insert)
+        assert mock_cursor.execute.call_count >= 2
+
+    def test_returns_none_when_no_emotion(self):
+        from emotionGameQueries import log_guess_attempt
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = None  # no active emotion
+        mock_cursor.lastrowid = None
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        turn = make_turn()  # no emotion_guessed_id
+
+        with patch("emotionGameQueries.get_cursor") as mock_get_cursor:
+            mock_get_cursor.return_value.__enter__.return_value = (mock_conn, mock_cursor)
+
+            result = log_guess_attempt(turn, player_guess="hello", correct=False)
+
+        assert result is None
+        mock_conn.commit.assert_not_called()
+
+
+class TestUpdateShareStory:
+    """Tests for update_share_story()."""
+
+    def test_updates_latest_attempt(self):
+        from emotionGameQueries import update_share_story
+        mock_cursor = MagicMock()
+        mock_cursor.rowcount = 1
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        turn = make_turn(idUser=5, idNPC=3)
+
+        with patch("emotionGameQueries.get_cursor") as mock_get_cursor:
+            mock_get_cursor.return_value.__enter__.return_value = (mock_conn, mock_cursor)
+
+            result = update_share_story(turn, share_story="I felt happy when...")
+
+        assert result is True
+        mock_conn.commit.assert_called_once()
+
+    def test_skips_empty_story(self):
+        from emotionGameQueries import update_share_story
+        mock_cursor = MagicMock()
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        turn = make_turn()
+
+        with patch("emotionGameQueries.get_cursor") as mock_get_cursor:
+            mock_get_cursor.return_value.__enter__.return_value = (mock_conn, mock_cursor)
+
+            result = update_share_story(turn, share_story="   ")
+
+        assert result is False
+        mock_conn.commit.assert_not_called()
+
+
+class TestGetPlayerGameLog:
+    """Tests for get_player_game_log()."""
+
+    def test_returns_chronological_log(self):
+        from emotionGameQueries import get_player_game_log
+        mock_cursor = MagicMock()
+        mock_cursor.fetchall.return_value = [
+            {"idAttempt": 1, "player_name": "Alice", "emotion": "happy",
+             "player_guess": "happy", "correct": 1,
+             "feedback_text": "Yes!", "share_story": "I was happy when...",
+             "attemptedAt": "2026-01-01 12:00:00"},
+            {"idAttempt": 2, "player_name": "Alice", "emotion": "sad",
+             "player_guess": "angry", "correct": 0,
+             "feedback_text": "Not quite...", "share_story": None,
+             "attemptedAt": "2026-01-01 12:01:00"},
+        ]
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        with patch("emotionGameQueries.get_cursor") as mock_get_cursor:
+            mock_get_cursor.return_value.__enter__.return_value = (mock_conn, mock_cursor)
+
+            result = get_player_game_log(id_user=1, id_npc=2)
+
+        assert len(result) == 2
+        assert result[0]["emotion"] == "happy"
+        assert result[0]["share_story"] is not None
+        assert result[1]["correct"] == 0

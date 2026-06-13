@@ -60,9 +60,9 @@ class TestBuildIntroPrompt:
         assert "Mira" in prompt
 
     def test_contains_player_name(self):
-        from emotion_game.build_intro_prompt import build_intro_prompt
+        from emotion_game.build_intro_prompt import build_explain_situation_prompt
         turn = make_turn(player_name="Alice")
-        prompt = build_intro_prompt(turn)
+        prompt = build_explain_situation_prompt(turn)
         assert "Alice" in prompt
 
     def test_contains_npc_role(self):
@@ -72,9 +72,9 @@ class TestBuildIntroPrompt:
         assert "forest guide" in prompt
 
     def test_contains_ask_for_help(self):
-        from emotion_game.build_intro_prompt import build_intro_prompt
+        from emotion_game.build_intro_prompt import build_explain_situation_prompt
         turn = make_turn()
-        prompt = build_intro_prompt(turn)
+        prompt = build_explain_situation_prompt(turn)
         assert "help" in prompt.lower()
 
     def test_returns_string(self):

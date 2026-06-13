@@ -9,6 +9,12 @@ AUDIO_DIR = "./tts_cache"
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 # ------------------------------------------------------------------
+# Voice gate — set VOICE=0 in .env to disable ElevenLabs TTS entirely.
+# Text streaming still works; audio chunks are silently skipped.
+# ------------------------------------------------------------------
+VOICE_ENABLED = os.getenv("VOICE", "1").strip().lower() in ("1", "true", "yes", "on")
+
+# ------------------------------------------------------------------
 # Voice configuration — single source of truth
 # ------------------------------------------------------------------
 # Charlotte: natural, expressive, handles low stability without artifacts.
@@ -221,6 +227,10 @@ def saveAudio(audio):
     return {"audio_id": audio_id}, 200
 
 def tts_cached(text, voice_id, emotion):
+    """Same as tts() but caches audio to disk.
+    
+    When VOICE_ENABLED is False, only serves from disk cache."""
+    
     key = tts_cache_key(text, voice_id, emotion)
     path = f"{AUDIO_DIR}/{key}.mp3"
     if os.path.exists(path):
@@ -232,6 +242,11 @@ def tts_cached(text, voice_id, emotion):
                     break
                 yield chunk
         return
+    
+    if not VOICE_ENABLED:
+        print(f"[tts-cached] VOICE=0, cache miss — skipping ElevenLabs API: {text[:60]!r}")
+        return
+    
     # Generate and cache
     chunks = []
     for chunk in tts(text, voice_id, emotion):
@@ -245,6 +260,10 @@ def tts_cached(text, voice_id, emotion):
 
 # Main TTS function
 def tts(text, voice_id, emotion):
+    if not VOICE_ENABLED:
+        print(f"[tts] VOICE=0 — skipping ElevenLabs API: {text[:60]!r}")
+        return
+
     print("\nTTS DEBUG:\n", voice_id)
     voice_settings = EMOTION_VOICE_SETTINGS.get(emotion, _DEFAULT_VOICE_SETTINGS)
     tagged_text = _apply_audio_tags(text, emotion)
@@ -255,7 +274,7 @@ def tts(text, voice_id, emotion):
         audio_stream = _eleven.text_to_speech.convert(
             voice_id=voice_id,
             text=tagged_text,
-            model_id="eleven_v3",  # native [bracket tag] support — tags control delivery, not spoken
+            model_id="eleven_v3",
             voice_settings=voice_settings,
         )
         for chunk in audio_stream:
@@ -274,6 +293,11 @@ def tts_with_timestamps(text, voice_id, emotion):
     alignment_* lists are populated incrementally — only the last chunk with
     alignment data will have non-empty lists.  Callers must accumulate.
     """
+    
+    if not VOICE_ENABLED:
+        print(f"[tts+timestamps] VOICE=0 — skipping ElevenLabs API: {text[:60]!r}")
+        return
+
     voice_settings = EMOTION_VOICE_SETTINGS.get(emotion, _DEFAULT_VOICE_SETTINGS)
     tagged_text = _apply_audio_tags(text, emotion)
     print(f"TTS+timestamps: voiceID={voice_id} emotion={emotion}")
@@ -307,7 +331,13 @@ def tts_with_timestamps(text, voice_id, emotion):
 
 
 def tts_with_timestamps_cached(text, voice_id, emotion):
-    """Same as tts_with_timestamps but caches audio + alignment to disk."""
+    """Same as tts_with_timestamps but caches audio + alignment to disk.
+    
+    When VOICE_ENABLED is False, only serves from disk cache — never
+    calls the ElevenLabs API.  Cache-miss yields empty data so the
+    caller falls back to server-timed word display.
+    """
+
     import json
     key = tts_cache_key(text, voice_id, emotion)
     audio_path = f"{AUDIO_DIR}/{key}.mp3"
@@ -327,6 +357,12 @@ def tts_with_timestamps_cached(text, voice_id, emotion):
                 if not chunk:
                     break
                 yield (chunk, cached_chars, cached_starts, cached_ends)
+        return
+
+    # --- voice disabled + cache miss → skip API, fall back ---
+    if not VOICE_ENABLED:
+        print(f"[tts-cache] VOICE=0, cache miss — skipping ElevenLabs API: {text[:60]!r}")
+        yield (b"", [], [], [])
         return
 
     # --- cache miss: generate, cache, yield ---

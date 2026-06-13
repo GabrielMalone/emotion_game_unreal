@@ -4,10 +4,11 @@ from emotion_game.npc_describe_emotion import npc_describe_emotion
 from emotion_game.player_guess import player_guess
 from emotionGameQueries import assign_next_emotion
 import openAIqueries
+from openAIqueries import extract_player_name
 from llm_client import client
 from streamNPCresponse.streamTextResponse import streamResponse
 from turnContext import EmotionGameTurn
-from emotionGameQueries import get_active_emotion, get_remaining_emotions
+from emotionGameQueries import get_active_emotion, get_remaining_emotions, update_share_story, append_game_md_log
 from db import get_cursor
 
 logger = logging.getLogger(__name__)
@@ -238,8 +239,19 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
 
     # -------- PLAYER NAME PHASE --------
     if turn.waiting_for_name:
-        # Player just told us their name
-        turn.player_name = player_text.strip()
+        # Player just told us their name — extract it with LLM
+        name = extract_player_name(player_text, client)
+        if not name or not name.strip():
+            # No name found — ask again
+            logger.info(f"[name-extract] no name in '{player_text}', re-asking")
+            try:
+                sio.emit("npc_responded",
+                        {"text": "I'm sorry, I didn't quite hear your name. What should I call you?"},
+                        room=f"user:{turn.idUser}")
+            except Exception:
+                pass
+            return
+        turn.player_name = name
         turn.waiting_for_name = False
         # After a game_continue name ask, skip the full intro and go
         # straight to describing the next emotion.
@@ -265,9 +277,28 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
                 pass
             assignEmotion(turn, sio)
             return
-        # NPC greets by name and explains their situation
-        from emotion_game.npc_introduce import npc_explain_situation
-        npc_explain_situation(turn, sio)
+        # NPC already explained their dilemma and asked for name in the
+        # intro — skip the agreement and go straight to the game.
+        # Add a greeting note so the NPC acknowledges the player by name
+        # before describing the first emotion.
+        turn.npc_memory = (
+            f"[NOTE: You just learned the player's name is {turn.player_name}. "
+            f"Greet {turn.player_name} warmly by name before you start "
+            f"describing what you're feeling right now.]"
+        )
+        from phase_2_queries import update_NPC_user_memory_query
+        update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
+
+        turn.game_started = True
+        turn.guessing_started = False
+        append_game_md_log(turn, "start",
+                          f"Game started! Player **{turn.player_name}** is helping "
+                          f"NPC {turn.idNPC} identify their emotions.")
+        sio.emit("game_start", {}, room=f"user:{turn.idUser}")
+        sio.emit("remaining_emotions",
+                {"remaining_emotions": get_remaining_emotions(turn)},
+                room=f"user:{turn.idUser}")
+        assignEmotion(turn, sio)
         return
 
     # -------- SHARE EXPERIENCE PHASE --------
@@ -279,11 +310,20 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
 
         turn.npc_memory = f"{turn.player_name} shared about a time they felt {turn.last_correct_emotion}: {turn.player_text}"
         update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
+
+        # persist the share story against the latest correct guess attempt
+        update_share_story(turn, share_story=turn.player_text)
+
         turn.npc_memory = getNPCmem(turn)
 
         turn.prompt = build_share_response_prompt(turn)
         turn.last_npc_text = streamResponse(turn, client=client, sio=sio)
         print("\nNPC SHARE RESPONSE:", turn.last_npc_text)
+
+        append_game_md_log(turn, "share",
+                          f"{turn.player_name} shared about feeling **{turn.last_correct_emotion}**:\n\n"
+                          f"> {turn.player_text}\n\n"
+                          f"NPC: _{turn.last_npc_text}_")
 
         turn.npc_memory = f"[You just responded to {turn.player_name} with:] '{turn.last_npc_text}'"
         update_NPC_user_memory_query(turn.idNPC, turn.idUser, turn.npc_memory)
@@ -326,6 +366,9 @@ def _advance_game_impl(turn, player_text, npc_text, sio):
 
         turn.game_started = True
         turn.guessing_started = False
+        append_game_md_log(turn, "start",
+                          f"Game started! Player **{turn.player_name}** agreed to help "
+                          f"NPC {turn.idNPC} identify their emotions.")
         sio.emit("game_start", {}, room=f"user:{turn.idUser}")
         sio.emit("remaining_emotions", {"remaining_emotions": get_remaining_emotions(turn)}, room=f"user:{turn.idUser}")
 
